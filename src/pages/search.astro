@@ -1,0 +1,360 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="搜索" description="在全部文章中搜索关键词。" noindex>
+  <div class="shell search-shell">
+    <header class="search-head">
+      <p class="search-head__path mono"><span class="dim">~/</span>search<span class="dim">/</span></p>
+      <h1 class="search-head__title">搜索</h1>
+    </header>
+
+    <div class="search-box">
+      <span class="search-box__prompt mono" aria-hidden="true">&gt;</span>
+      <input
+        id="q"
+        class="search-box__input mono"
+        type="search"
+        placeholder="输入关键词，支持中文 / 英文 / 标签"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="搜索关键词"
+      />
+      <kbd class="search-box__hint mono" id="hint">/</kbd>
+    </div>
+
+    <p class="search-status mono" id="status">输入关键词开始搜索</p>
+
+    <ol class="search-results" id="results"></ol>
+  </div>
+</BaseLayout>
+
+<script>
+  interface Doc {
+    title: string;
+    description: string;
+    tags: string[];
+    date: string;
+    url: string;
+    text: string;
+  }
+
+  const input = document.getElementById('q') as HTMLInputElement | null;
+  const status = document.getElementById('status');
+  const results = document.getElementById('results');
+  const hint = document.getElementById('hint');
+
+  const escapeHtml = (s: string) =>
+    s.replace(
+      /[&<>"']/g,
+      (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c
+    );
+
+  const highlight = (text: string, terms: string[]) => {
+    let out = escapeHtml(text);
+    for (const term of terms) {
+      if (!term) continue;
+      const safe = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      out = out.replace(new RegExp(`(${safe})`, 'gi'), '<mark>$1</mark>');
+    }
+    return out;
+  };
+
+  const snippet = (text: string, terms: string[]) => {
+    if (!text) return '';
+    const lower = text.toLowerCase();
+    let at = -1;
+    for (const term of terms) {
+      const i = lower.indexOf(term.toLowerCase());
+      if (i >= 0 && (at < 0 || i < at)) at = i;
+    }
+    if (at < 0) return text.slice(0, 110);
+    const start = Math.max(0, at - 40);
+    return `${start > 0 ? '…' : ''}${text.slice(start, start + 130)}${
+      start + 130 < text.length ? '…' : ''
+    }`;
+  };
+
+  let docs: Doc[] = [];
+  let loading = false;
+
+  const load = async () => {
+    if (docs.length > 0 || loading) return docs;
+    loading = true;
+    try {
+      const res = await fetch('/search.json');
+      docs = (await res.json()) as Doc[];
+    } catch {
+      docs = [];
+    } finally {
+      loading = false;
+    }
+    return docs;
+  };
+
+  const run = async (raw: string) => {
+    const query = raw.trim().toLowerCase();
+    if (!results || !status) return;
+
+    if (!query) {
+      results.innerHTML = '';
+      status.textContent = '输入关键词开始搜索';
+      return;
+    }
+
+    await load();
+    const terms = query.split(/\s+/).filter(Boolean);
+
+    const scored = docs
+      .map((doc) => {
+        const title = doc.title.toLowerCase();
+        const tags = doc.tags.join(' ').toLowerCase();
+        const desc = doc.description.toLowerCase();
+        const body = doc.text.toLowerCase();
+
+        let score = 0;
+        for (const term of terms) {
+          if (title.includes(term)) score += 20;
+          if (tags.includes(term)) score += 10;
+          if (desc.includes(term)) score += 6;
+          if (body.includes(term)) score += 3;
+        }
+        const hitAll = terms.every(
+          (t) => title.includes(t) || tags.includes(t) || desc.includes(t) || body.includes(t)
+        );
+        return { doc, score: hitAll ? score : 0 };
+      })
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    status.textContent =
+      scored.length > 0
+        ? `找到 ${scored.length} 篇相关文章`
+        : `没有匹配「${raw.trim()}」的文章`;
+
+    results.innerHTML = scored
+      .map(
+        ({ doc }) => `
+        <li class="search-result">
+          <a class="search-result__link" href="${doc.url}">
+            <div class="search-result__top">
+              <span class="search-result__date mono">${doc.date.replaceAll('-', '.')}</span>
+              <h2 class="search-result__title mono">${highlight(doc.title, terms)}</h2>
+            </div>
+            <p class="search-result__desc">${highlight(snippet(doc.description, terms), terms)}</p>
+            <p class="search-result__snippet mono">${highlight(snippet(doc.text, terms), terms)}</p>
+            <div class="search-result__tags mono">${doc.tags.map((t) => `#${escapeHtml(t)}`).join('  ')}</div>
+          </a>
+        </li>`
+      )
+      .join('');
+  };
+
+  // 从 URL 带入查询词，方便分享搜索结果
+  const params = new URLSearchParams(location.search);
+  if (input) {
+    const initial = params.get('q') ?? '';
+    if (initial) {
+      input.value = initial;
+      void run(initial);
+    }
+
+    let timer: number | undefined;
+    input.addEventListener('input', () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => void run(input.value), 120);
+    });
+  }
+
+  // 快捷键：/ 聚焦，Esc 清空
+  document.addEventListener('keydown', (event) => {
+    const tag = (event.target as HTMLElement | null)?.tagName;
+    const typing = tag === 'INPUT' || tag === 'TEXTAREA';
+
+    if (event.key === '/' && !typing) {
+      event.preventDefault();
+      input?.focus();
+    }
+    if (event.key === 'Escape' && typing) {
+      if (input) input.value = '';
+      void run('');
+      input?.blur();
+    }
+  });
+
+  input?.addEventListener('focus', () => hint?.classList.add('is-hidden'));
+  input?.addEventListener('blur', () => hint?.classList.remove('is-hidden'));
+</script>
+
+<style>
+  .search-shell {
+    max-width: 780px;
+  }
+
+  .search-head {
+    margin-bottom: 28px;
+  }
+
+  .search-head__path {
+    font-size: 12.5px;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+
+  .search-head__title {
+    font-family: var(--font-mono);
+    font-size: clamp(1.6rem, 3vw, 2.1rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .search-box:focus-within {
+    border-color: var(--accent-line);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .search-box__prompt {
+    color: var(--accent);
+    font-size: 15px;
+  }
+
+  .search-box__input {
+    flex: 1;
+    min-width: 0;
+    padding: 15px 0;
+    border: none;
+    background: none;
+    color: var(--text);
+    font-size: 14.5px;
+    outline: none;
+  }
+
+  .search-box__input::placeholder {
+    color: var(--text-dim);
+  }
+
+  .search-box__input::-webkit-search-cancel-button {
+    filter: grayscale(1);
+    opacity: 0.5;
+  }
+
+  .search-box__hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    background: var(--surface-2);
+    transition: opacity 0.15s;
+  }
+
+  .search-box__hint.is-hidden {
+    opacity: 0;
+  }
+
+  .search-status {
+    margin: 18px 0 8px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    letter-spacing: 0.02em;
+  }
+
+  .search-results {
+    list-style: none;
+    padding: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .search-result {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-result__link {
+    display: block;
+    padding: 18px 12px 18px 0;
+    border-left: 2px solid transparent;
+    margin-left: -12px;
+    padding-left: 12px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .search-result__link:hover {
+    border-left-color: var(--accent);
+    background: linear-gradient(90deg, var(--accent-soft), transparent 70%);
+  }
+
+  .search-result__top {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+
+  .search-result__date {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .search-result__title {
+    font-size: 15.5px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  .search-result__link:hover .search-result__title {
+    color: var(--accent-strong);
+  }
+
+  .search-result__desc {
+    margin-top: 6px;
+    margin-left: 0;
+    font-size: 13.5px;
+    color: var(--text-muted);
+    line-height: 1.65;
+  }
+
+  .search-result__snippet {
+    margin-top: 6px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  .search-result__tags {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  :global(mark) {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border-radius: 3px;
+    padding: 0 2px;
+  }
+
+  @media (max-width: 560px) {
+    .search-result__top {
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .search-result__snippet {
+      display: none;
+    }
+  }
+</style>

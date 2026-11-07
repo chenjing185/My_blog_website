@@ -1,0 +1,226 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PostCard from '../components/PostCard.astro';
+import { SITE, LATEST_POSTS } from '../consts';
+import { getPosts, collectTags } from '../utils/posts';
+import { formatDate } from '../utils/format';
+
+const posts = await getPosts();
+const latest = posts.slice(0, LATEST_POSTS);
+const allTags = collectTags(posts);
+const tags = allTags.slice(0, 10);
+const updated = posts[0]?.data.pubDate;
+---
+
+<BaseLayout>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero__intro">
+        <p class="hero__kicker mono">
+          <span class="dim">~/</span>{SITE.title}<span class="dim">/index</span>
+        </p>
+
+        <h1 class="hero__title">{SITE.tagline}</h1>
+
+        <p class="hero__desc">{SITE.description}</p>
+
+        <div class="hero__actions">
+          <a class="btn" href="/blog/">浏览全部文章 <span aria-hidden="true">→</span></a>
+          <a class="btn btn--ghost" href="/rss.xml">RSS 订阅</a>
+        </div>
+
+        <ul class="hero__stats mono">
+          <li><span class="hero__num">{posts.length}</span> posts</li>
+          <li><span class="hero__num">{allTags.length}</span> tags</li>
+          <li><span class="hero__num">{SITE.since}</span> since</li>
+        </ul>
+      </div>
+
+      <div class="term hero__term" aria-hidden="true">
+        <div class="term__bar">
+          <span class="term__dot term__dot--r"></span>
+          <span class="term__dot term__dot--y"></span>
+          <span class="term__dot term__dot--g"></span>
+          <span class="term__title">zsh — ~/{SITE.title} — 80×24</span>
+        </div>
+        <div class="term__body">
+          <p class="cmd">whoami</p>
+          <p class="out">{SITE.author.name} <span class="dim">·</span> {SITE.author.bio}</p>
+          <p class="cmd">ls ./blog | head -3</p>
+          <p class="out">
+            {latest.map((p) => p.id).slice(0, 3).join('\n')}
+          </p>
+          <p class="cmd">cat status.txt</p>
+          <p class="out">
+            最近更新 <span class="key">{updated ? formatDate(updated) : '——'}</span>
+          </p>
+          <p class="cmd">echo "keep writing" <span class="caret"></span></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-section">
+      <div class="home-section__head">
+        <h2 class="section-label">latest</h2>
+        <a class="mono home-section__more" href="/blog/">all posts →</a>
+      </div>
+
+      {
+        latest.length > 0 ? (
+          <ul class="post-list">
+            {latest.map((post) => (
+              <PostCard post={post} />
+            ))}
+          </ul>
+        ) : (
+          <p class="muted mono">还没有文章，去 src/content/blog/ 写第一篇吧。</p>
+        )
+      }
+    </section>
+
+    {
+      allTags.length > 0 && (
+        <section class="home-section">
+          <div class="home-section__head">
+            <h2 class="section-label">tags</h2>
+            <a class="mono home-section__more" href="/tags/">
+              all tags →
+            </a>
+          </div>
+          <ul class="tag-list">
+            {tags.map((t) => (
+              <li>
+                <a class="tag" href={`/tags/${t.slug}/`}>
+                  {t.label}
+                  <span class="tag__count">{t.count}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: 56px;
+    align-items: center;
+    padding-block: 40px 72px;
+  }
+
+  .hero__kicker {
+    font-size: 12.5px;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    margin-bottom: 20px;
+  }
+
+  .hero__title {
+    font-family: var(--font-mono);
+    font-size: clamp(1.9rem, 4.2vw, 2.9rem);
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+
+  .hero__title::after {
+    content: '';
+    display: block;
+    width: 48px;
+    height: 2px;
+    margin-top: 24px;
+    background: var(--accent);
+    opacity: 0.75;
+  }
+
+  .hero__desc {
+    margin-top: 24px;
+    font-size: 15.5px;
+    line-height: 1.8;
+    color: var(--text-muted);
+    max-width: 44ch;
+  }
+
+  .hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 28px;
+  }
+
+  .hero__stats {
+    display: flex;
+    gap: 24px;
+    margin-top: 32px;
+    list-style: none;
+    padding: 0;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .hero__num {
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  .hero__term {
+    font-size: 13px;
+  }
+
+  .home-section {
+    margin-top: 56px;
+  }
+
+  .home-section__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .home-section__head .section-label {
+    margin-bottom: 0;
+  }
+
+  .home-section__more {
+    font-size: 12px;
+    color: var(--text-dim);
+    transition: color 0.15s;
+  }
+
+  .home-section__more:hover {
+    color: var(--accent);
+  }
+
+  .tag__count {
+    margin-left: 6px;
+    color: var(--text-dim);
+    font-size: 10.5px;
+  }
+
+  .tag:hover .tag__count {
+    color: var(--accent);
+  }
+
+  @media (max-width: 900px) {
+    .hero {
+      grid-template-columns: 1fr;
+      gap: 40px;
+      padding-block: 16px 48px;
+    }
+
+    .hero__term {
+      order: 2;
+    }
+
+    .hero__desc {
+      max-width: none;
+    }
+  }
+</style>

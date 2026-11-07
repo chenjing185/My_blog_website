@@ -1,0 +1,28 @@
+---
+import { SITE } from '../consts';
+
+const year = new Date().getFullYear();
+const range = year > SITE.since ? `${SITE.since}–${year}` : `${SITE.since}`;
+
+const isExternal = (href: string) => href.startsWith('http');
+---
+
+<footer class="site-footer">
+  <div class="shell site-footer__inner">
+    <p>© {range} {SITE.author.name} · 内容采用 CC BY-NC-SA 4.0 许可</p>
+    <div class="footer-links">
+      {
+        SITE.social.map((item) => (
+          <a
+            href={item.href}
+            target={isExternal(item.href) ? '_blank' : undefined}
+            rel={isExternal(item.href) ? 'noopener noreferrer' : undefined}
+          >
+            {item.label}
+          </a>
+        ))
+      }
+      <span class="dim">built with astro</span>
+    </div>
+  </div>
+</footer>

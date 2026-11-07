@@ -1,0 +1,109 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SITE } from '../consts';
+import { getPosts } from '../utils/posts';
+
+const posts = await getPosts();
+const stack = [
+  { name: 'Astro', note: '静态站点框架' },
+  { name: 'TypeScript', note: '类型安全' },
+  { name: 'Markdown', note: '内容源' },
+  { name: 'Shiki', note: '构建期代码高亮' },
+  { name: '原生 CSS', note: '设计令牌 + 无运行时' },
+];
+---
+
+<BaseLayout title="关于" description={`关于 ${SITE.title} 与作者。`}>
+  <div class="shell about">
+    <header class="page-head">
+      <p class="page-head__path mono"><span class="dim">~/</span>about<span class="dim">/</span></p>
+      <h1 class="page-head__title">关于</h1>
+    </header>
+
+    <div class="term about__term">
+      <div class="term__bar">
+        <span class="term__dot term__dot--r"></span>
+        <span class="term__dot term__dot--y"></span>
+        <span class="term__dot term__dot--g"></span>
+        <span class="term__title">cat about.md</span>
+      </div>
+      <div class="term__body">
+        <p class="cmd">cat about.md</p>
+        <p class="out">
+          <span class="key">{SITE.author.name}</span> — {SITE.author.bio}
+        </p>
+        <p class="out">这里是 {SITE.title}，一个纯静态的写作空间。</p>
+        <p class="out">目前有 {posts.length} 篇文章，没有评论、没有算法推荐。</p>
+        <p class="cmd">uptime --since <span class="caret"></span></p>
+      </div>
+    </div>
+
+    <div class="prose about__prose">
+      <h2>关于这个站点</h2>
+      <p>
+        这个博客用 <a href="https://astro.build" target="_blank" rel="noopener noreferrer">Astro</a>
+        构建，最终产物是纯静态的 HTML/CSS，没有前端框架运行时，首屏几乎零 JS。
+        文章用 Markdown 写，代码高亮在构建期完成，主题色由一组 CSS 变量驱动。
+      </p>
+      <p>
+        之所以选择静态站，是因为写作本身不需要数据库：内容即文件，改完提交，
+        构建一次就发布。备份只需要 push 到远端仓库。
+      </p>
+
+      <h2>技术栈</h2>
+      <ul>
+        {stack.map((item) => (
+          <li>
+            <strong>{item.name}</strong> — {item.note}
+          </li>
+        ))}
+      </ul>
+
+      <h2>写什么</h2>
+      <ul>
+        <li>工程实践：踩坑记录、架构取舍、工具链配置</li>
+        <li>设计系统：排版、配色、可访问性</li>
+        <li>读书与长文的笔记整理</li>
+      </ul>
+
+      <h2>联系</h2>
+      <p>
+        最直接的方式是
+        <a href="/rss.xml">订阅 RSS</a>，或者在
+        <a href="https://github.com/" target="_blank" rel="noopener noreferrer">GitHub</a>
+        上找到我。本站内容采用 CC BY-NC-SA 4.0 许可，转载请注明出处。
+      </p>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .about {
+    max-width: 780px;
+  }
+
+  .page-head {
+    margin-bottom: 32px;
+  }
+
+  .page-head__path {
+    font-size: 12.5px;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+
+  .page-head__title {
+    font-family: var(--font-mono);
+    font-size: clamp(1.6rem, 3vw, 2.1rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .about__term {
+    margin-bottom: 48px;
+  }
+
+  .about__prose {
+    max-width: none;
+  }
+</style>

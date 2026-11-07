@@ -1,0 +1,97 @@
+---
+import { SITE } from '../consts';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import BaseHead from '../components/BaseHead.astro';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  type?: 'website' | 'article';
+  noindex?: boolean;
+}
+
+const { title, description, image, type = 'website', noindex = false } = Astro.props;
+---
+
+<!doctype html>
+<html lang={SITE.lang} data-theme="dark">
+  <head>
+    <!-- 主题必须在首次绘制前确定，避免白屏闪烁 -->
+    <script is:inline>
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme');
+          document.documentElement.dataset.theme = saved === 'light' ? 'light' : 'dark';
+        } catch (e) {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
+    <BaseHead title={title} description={description} image={image} type={type} noindex={noindex} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到正文</a>
+    <Header />
+    <main id="main" class="site-main">
+      <slot />
+    </main>
+    <Footer />
+
+    <script>
+      // 为每个代码块加「复制」按钮 + 外层容器
+      const blocks = document.querySelectorAll('pre.astro-code');
+      blocks.forEach((pre) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'code-wrap';
+        pre.parentNode?.insertBefore(wrap, pre);
+        wrap.appendChild(pre);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'copy-btn';
+        btn.textContent = 'COPY';
+        btn.setAttribute('aria-label', '复制代码');
+
+        btn.addEventListener('click', async () => {
+          const text = pre.querySelector('code')?.textContent ?? pre.textContent ?? '';
+          try {
+            await navigator.clipboard.writeText(text);
+            btn.textContent = 'COPIED';
+            btn.dataset.copied = 'true';
+          } catch {
+            btn.textContent = 'FAILED';
+          }
+          window.setTimeout(() => {
+            btn.textContent = 'COPY';
+            btn.dataset.copied = 'false';
+          }, 1600);
+        });
+
+        wrap.appendChild(btn);
+      });
+    </script>
+  </body>
+</html>
+
+<style>
+  .skip-link {
+    position: absolute;
+    top: -100px;
+    left: 16px;
+    z-index: 100;
+    padding: 8px 14px;
+    background: var(--accent);
+    color: #04120f;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    border-radius: 0 0 8px 8px;
+    transition: top 0.2s;
+  }
+
+  .skip-link:focus {
+    top: 0;
+  }
+</style>

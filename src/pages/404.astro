@@ -1,0 +1,71 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="404" description="页面不存在。" noindex>
+  <div class="shell notfound">
+    <div class="term">
+      <div class="term__bar">
+        <span class="term__dot term__dot--r"></span>
+        <span class="term__dot term__dot--y"></span>
+        <span class="term__dot term__dot--g"></span>
+        <span class="term__title">zsh — 404</span>
+      </div>
+      <div class="term__body">
+        <p class="cmd">cd <span class="err" id="missing">/this-page</span></p>
+        <p class="err">cd: no such file or directory</p>
+        <p class="cmd">grep -r "content" . --include="*.md"</p>
+        <p class="out">0 results</p>
+        <p class="cmd">echo "404" <span class="caret"></span></p>
+      </div>
+    </div>
+
+    <div class="notfound__text">
+      <h1 class="notfound__code">404</h1>
+      <p class="notfound__desc">这个地址没有对应的页面，可能已经被移动或删除了。</p>
+      <div class="notfound__actions">
+        <a class="btn" href="/">返回首页</a>
+        <a class="btn btn--ghost" href="/blog/">看看文章</a>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .notfound {
+    max-width: 620px;
+    padding-top: 24px;
+  }
+
+  .term__body .err {
+    color: #ff6b6b;
+  }
+
+  .notfound__text {
+    margin-top: 40px;
+  }
+
+  .notfound__code {
+    font-family: var(--font-mono);
+    font-size: clamp(3rem, 12vw, 5rem);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    color: var(--text);
+    opacity: 0.9;
+  }
+
+  .notfound__desc {
+    margin-top: 14px;
+    color: var(--text-muted);
+    font-size: 15px;
+    max-width: 40ch;
+  }
+
+  .notfound__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 26px;
+  }
+</style>

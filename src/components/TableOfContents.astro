@@ -1,0 +1,193 @@
+---
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+  headings: MarkdownHeading[];
+  /** 移动端折叠版 */
+  mobile?: boolean;
+}
+
+const { headings, mobile = false } = Astro.props;
+const items = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+{
+  items.length > 1 &&
+    (mobile ? (
+      <details class="toc-mobile">
+        <summary>
+          <span>目录</span>
+          <span class="dim">{items.length}</span>
+        </summary>
+        <ul>
+          {items.map((h) => (
+            <li class={`lvl-${h.depth}`}>
+              <a href={`#${h.slug}`}>{h.text}</a>
+            </li>
+          ))}
+        </ul>
+      </details>
+    ) : (
+      <nav class="toc" aria-label="文章目录">
+        <p class="toc__title">on this page</p>
+        <ul>
+          {items.map((h) => (
+            <li class={`toc__item lvl-${h.depth}`}>
+              <a href={`#${h.slug}`} data-toc-link>
+                {h.text}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    ))
+}
+
+<script>
+  // 滚动高亮当前章节
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('a[data-toc-link]')];
+  if (links.length > 0) {
+    const map = new Map<string, HTMLAnchorElement[]>();
+    for (const link of links) {
+      const id = decodeURIComponent(link.hash.slice(1));
+      const list = map.get(id) ?? [];
+      list.push(link);
+      map.set(id, list);
+    }
+
+    const setActive = (id: string) => {
+      for (const [key, els] of map) {
+        for (const el of els) {
+          el.classList.toggle('is-active', key === id);
+        }
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) setActive(visible[0].target.id);
+      },
+      { rootMargin: '-72px 0px -70% 0px', threshold: 0 }
+    );
+
+    for (const id of map.keys()) {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    }
+  }
+</script>
+
+<style>
+  .toc {
+    position: sticky;
+    top: calc(var(--header-h) + 32px);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+
+  .toc__title {
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+  }
+
+  .toc__title::before {
+    content: '// ';
+    color: var(--accent);
+    opacity: 0.6;
+  }
+
+  .toc ul,
+  .toc-mobile ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: 1px solid var(--border);
+  }
+
+  .toc li a {
+    display: block;
+    padding: 5px 0 5px 14px;
+    margin-left: -1px;
+    border-left: 1px solid transparent;
+    color: var(--text-dim);
+    transition: color 0.15s, border-color 0.15s;
+    text-wrap: pretty;
+  }
+
+  .toc li a:hover {
+    color: var(--text);
+    border-left-color: var(--border-strong);
+  }
+
+  .toc li a.is-active {
+    color: var(--accent-strong);
+    border-left-color: var(--accent);
+  }
+
+  .toc .lvl-3 a {
+    padding-left: 28px;
+    font-size: 12px;
+  }
+
+  /* 移动端折叠目录 */
+  .toc-mobile {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    margin-bottom: 32px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  .toc-mobile summary {
+    display: flex;
+    justify-content: space-between;
+    padding: 11px 14px;
+    color: var(--text-muted);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+
+  .toc-mobile summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .toc-mobile summary::before {
+    content: '▸';
+    color: var(--accent);
+    margin-right: 8px;
+    transition: transform 0.15s;
+  }
+
+  .toc-mobile[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .toc-mobile summary > span:first-of-type {
+    margin-right: auto;
+  }
+
+  .toc-mobile ul {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding: 10px 14px 14px;
+  }
+
+  .toc-mobile li a {
+    padding: 4px 0;
+    color: var(--text-muted);
+  }
+
+  .toc-mobile .lvl-3 a {
+    padding-left: 16px;
+    font-size: 12.5px;
+  }
+</style>

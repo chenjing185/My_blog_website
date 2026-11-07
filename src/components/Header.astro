@@ -1,0 +1,40 @@
+---
+import { SITE } from '../consts';
+import ThemeToggle from './ThemeToggle.astro';
+
+const current = Astro.url.pathname.replace(/\/+$/, '') || '/';
+
+function isActive(href: string): boolean {
+  const target = href.replace(/\/+$/, '') || '/';
+  if (target === '/') return current === '/';
+  return current === target || current.startsWith(`${target}/`);
+}
+---
+
+<header class="site-header">
+  <div class="shell site-header__inner">
+    <a class="brand" href="/" aria-label={`${SITE.title} 首页`}>
+      <span class="brand__prompt">$</span><span class="brand__path">~/{SITE.title}</span>
+    </a>
+
+    <nav class="site-nav" aria-label="主导航">
+      {
+        SITE.nav.map((item) => (
+          <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+            {item.label}
+          </a>
+        ))
+      }
+    </nav>
+
+    <div class="header-actions">
+      <a class="icon-btn" href="/search/" aria-label="搜索文章" title="搜索 ( / )">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-3.5-3.5"></path>
+        </svg>
+      </a>
+      <ThemeToggle />
+    </div>
+  </div>
+</header>

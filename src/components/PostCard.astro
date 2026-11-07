@@ -1,0 +1,61 @@
+---
+import type { Post } from '../utils/posts';
+import { postUrl } from '../utils/posts';
+import { formatStamp, readingTime } from '../utils/format';
+
+interface Props {
+  post: Post;
+}
+
+const { post } = Astro.props;
+const { title, description, pubDate, tags, draft } = post.data;
+const minutes = readingTime(post.body);
+---
+
+<li class="post-item">
+  <a class="post-item__link" href={postUrl(post)}>
+    <time class="post-item__date" datetime={pubDate.toISOString()}>{formatStamp(pubDate)}</time>
+    <div class="post-item__body">
+      <h3 class="post-item__title">
+        {title}
+        {draft && <span class="draft-badge">draft</span>}
+      </h3>
+      <p class="post-item__desc">{description}</p>
+      <div class="post-item__meta">
+        <span>{minutes} min read</span>
+        {
+          tags.length > 0 && (
+            <>
+              <span class="dot" aria-hidden="true" />
+              <span class="post-item__tags">{tags.map((t) => `#${t}`).join('  ')}</span>
+            </>
+          )
+        }
+      </div>
+    </div>
+  </a>
+</li>
+
+<style>
+  .post-item__body {
+    min-width: 0;
+  }
+
+  .draft-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #febc2e;
+    border: 1px solid rgba(254, 188, 46, 0.35);
+    border-radius: 4px;
+    vertical-align: 2px;
+  }
+
+  .post-item__tags {
+    color: var(--text-dim);
+  }
+</style>

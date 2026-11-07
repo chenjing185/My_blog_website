@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# 部署后把域名换成你的真实地址
+Sitemap: https://example.com/sitemap-index.xml
