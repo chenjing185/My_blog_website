@@ -28,7 +28,9 @@ npm run preview    # 本地预览产物
 
 ```
 ├── astro.config.mjs         # 站点 URL、Markdown 高亮主题、sitemap
-├── public/                  # 原样拷贝的静态资源（favicon、robots.txt）
+├── netlify.toml             # Netlify 构建 / 缓存 / 安全头配置
+├── .nvmrc                   # Node 版本（22）
+├── public/                  # 原样拷贝的静态资源（favicon）
 └── src/
     ├── consts.ts            # ★ 站点配置：标题、作者、导航、社交链接
     ├── content.config.ts    # ★ 文章集合的 schema（frontmatter 字段定义）
@@ -43,6 +45,7 @@ npm run preview    # 本地预览产物
     │   ├── about.astro
     │   ├── search.astro     # 站内搜索（读取 /search.json）
     │   ├── search.json.ts   # 构建期生成的搜索索引
+    │   ├── robots.txt.ts    # 构建期生成，sitemap 地址跟随站点域名
     │   ├── rss.xml.ts
     │   └── 404.astro
     ├── styles/global.css    # 设计令牌 + 全部基础样式
@@ -91,15 +94,23 @@ cover: /images/xxx.jpg     # 可选，同时作为 og:image
 
 改 `src/consts.ts`：站名、副标题、作者、导航项、社交链接。
 
-### 2. 域名（**部署前必改**）
+### 2. 域名
 
-`astro.config.mjs` 里的 `site`，以及 `public/robots.txt` 里的 sitemap 地址：
+`site` 现在由环境变量解析（见 `astro.config.mjs`），顺序为：
 
-```js
-site: 'https://your-domain.com',
+```
+SITE_URL  →  Netlify 注入的 URL  →  https://example.com
 ```
 
-它决定 canonical、og:url、RSS 和 sitemap 里的绝对链接。
+也就是说：**部署到 Netlify 后不用手改代码**，构建时会自动取站点的 `.netlify.app` 地址；绑定自定义域名后，Netlify 注入的 `URL` 会变成你的域名。
+
+只有在需要强制指定（例如站点绑定了多个域名，想固定用其中一个做 canonical）时，才在 Netlify 站点设置里加环境变量：
+
+```
+SITE_URL = https://your-domain.com
+```
+
+它决定 canonical、og:url、RSS、sitemap 和 robots.txt 里的绝对链接。
 
 ### 3. 配色与排版
 
@@ -121,18 +132,64 @@ site: 'https://your-domain.com',
 
 `astro.config.mjs` 里 `markdown.shikiConfig.themes`，可换成任意 [Shiki 主题](https://shiki.style/themes) 名称（`light` / `dark` 各一个，CSS 会自动切换）。
 
-## 部署
+## 部署到 Netlify
+
+项目已经为 Netlify 做好配置，仓库根目录的 `netlify.toml` 包含构建命令、Node 版本、缓存头和统一尾斜杠的 301 规则。
+
+```
+netlify.toml     构建配置（已写好，无需改）
+.nvmrc           Node 22
+dist/            产物目录（publish）
+```
+
+### 方式一：连 Git 仓库（推荐，改一篇文章即自动发布）
+
+1. 把仓库推到 GitHub / GitLab / Gitee
+2. Netlify 控制台 → **Add new site → Import an existing project** → 选择仓库
+3. 构建配置会被 `netlify.toml` 自动读取，直接点 **Deploy**：
+
+   | 项 | 值 |
+   | --- | --- |
+   | Build command | `npm run build` |
+   | Publish directory | `dist` |
+   | Node version | `22` |
+
+4. 约 1 分钟构建完成，拿到 `https://<随机名>.netlify.app`
+5. 想改地址：**Site configuration → Change site name**
+
+### 方式二：命令行部署（不想连 Git）
+
+```bash
+npm i -g netlify-cli
+netlify login
+npm run build
+netlify deploy --prod --dir=dist
+```
+
+首次执行会让你选择或新建站点。
+
+### 绑定自定义域名
+
+1. **Domain management → Add a domain**，填入你的域名
+2. 按提示在 DNS 服务商处添加记录：
+   - 根域名：`A` 记录指向 Netlify 的负载均衡 IP
+   - `www` 子域名：`CNAME` 指向 `<your-site>.netlify.app`
+3. Netlify 自动签发 Let's Encrypt 证书（几分钟内生效，HTTP 会自动 301 到 HTTPS）
+
+换好域名后重新部署一次，让 canonical / sitemap / robots.txt 使用新域名。
+
+### 需要注意的两点
+
+- **不要删 `netlify.toml`**：里面的 `_astro/*` 缓存头是「内容不变则永不重新下载」的关键，删掉后每次访问都要回源。
+- **`package-lock.json` 已把依赖地址归一化到 `registry.npmjs.org`**。如果你在本地重新 `npm i` 时用了国内镜像，锁文件会被改回镜像地址，Netlify（美国机房）拉包会变慢——发布前可以检查一下：`grep -c npmmirror package-lock.json`，应为 0。
+
+## 其他部署方式
 
 产物是纯静态文件，任何静态托管都行。
 
-### Vercel / Netlify
+### Vercel / Cloudflare Pages
 
-导入仓库即可，框架会被自动识别：
-
-| 项 | 值 |
-| --- | --- |
-| Build command | `npm run build` |
-| Output directory | `dist` |
+导入仓库即可，构建配置同上（Build `npm run build`，Output `dist`）。
 
 ### GitHub Pages
 

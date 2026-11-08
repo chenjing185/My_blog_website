@@ -1,0 +1,60 @@
+# Netlify 构建配置
+# 文档：https://docs.netlify.com/configure-builds/file-based-configuration/
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # 与 package.json 的 engines 保持一致，避免 Netlify 默认版本漂移
+  NODE_VERSION = "22"
+  # Astro 会读取该变量作为 site（见 astro.config.mjs）
+  # 绑定自定义域名后如需强制指定，在此或站点设置里加 SITE_URL = "https://your-domain.com"
+
+# ---------- 缓存 ----------
+# 带 hash 的构建产物：一年不可变
+[[headers]]
+  for = "/_astro/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# HTML：始终回源校验，保证发布后立即生效
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# 订阅源与索引：短缓存
+[[headers]]
+  for = "/rss.xml"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/sitemap-index.xml"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+# ---------- 安全头 ----------
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# ---------- 路由 ----------
+# 站内使用 trailingSlash: 'always'，把无斜杠的访问统一 301 到带斜杠版本，
+# 避免同一内容出现两个可索引 URL。
+[[redirects]]
+  from = "/blog/:slug"
+  to = "/blog/:slug/"
+  status = 301
+  force = false
+
+[[redirects]]
+  from = "/tags/:slug"
+  to = "/tags/:slug/"
+  status = 301
+  force = false

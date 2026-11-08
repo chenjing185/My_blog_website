@@ -24,3 +24,6 @@ Thumbs.db
 # editors
 .vscode/
 .idea/
+
+# workbuddy 项目数据
+.workbuddy/

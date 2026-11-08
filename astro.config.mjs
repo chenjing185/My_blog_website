@@ -1,9 +1,17 @@
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 
-// ⚠️ 部署前把 site 改成你的真实域名（影响 canonical / RSS / sitemap 的绝对链接）
+/**
+ * 站点地址解析顺序：
+ *   1. SITE_URL —— 自定义域名时在 Netlify 环境变量里显式指定
+ *   2. URL      —— Netlify 构建期自动注入的站点主地址
+ *   3. 本地兜底
+ * 它决定 canonical / og:url / RSS / sitemap 里的绝对链接。
+ */
+const site = process.env.SITE_URL || process.env.URL || 'https://example.com';
+
 export default defineConfig({
-  site: 'https://example.com',
+  site,
   trailingSlash: 'always',
   integrations: [sitemap()],
   build: {
