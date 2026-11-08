@@ -1,0 +1,112 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { getPosts, collectCategories, toSlug } from '../../utils/posts';
+
+const posts = await getPosts();
+const categories = collectCategories(posts);
+
+const latestOf = (slug: string) =>
+  posts.find((p) => p.data.category && toSlug(p.data.category) === slug);
+---
+
+<BaseLayout title="分类" description="按分类浏览全部文章。">
+  <div class="shell">
+    <PageHeader
+      path="~/categories"
+      title="分类"
+      desc={`${categories.length} 个分类 · ${posts.length} 篇文章`}
+    />
+
+    {
+      categories.length > 0 ? (
+        <ul class="cat-grid">
+          {categories.map((cat) => {
+            const latest = latestOf(cat.slug);
+            return (
+              <li>
+                <a class="cat-card" href={`/categories/${cat.slug}/`}>
+                  <div class="cat-card__top">
+                    <span class="cat-card__slash mono">/</span>
+                    <span class="cat-card__name">{cat.label}</span>
+                    <span class="cat-card__count mono">{String(cat.count).padStart(2, '0')}</span>
+                  </div>
+                  {latest && (
+                    <p class="cat-card__latest mono">最新：{latest.data.title}</p>
+                  )}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p class="muted mono">还没有分类，在文章 frontmatter 里加 category 字段即可。</p>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .cat-grid {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+  }
+
+  .cat-card {
+    display: block;
+    height: 100%;
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    transition: border-color 0.18s, background 0.18s, transform 0.18s;
+  }
+
+  .cat-card:hover {
+    border-color: var(--accent-line);
+    background: var(--accent-soft);
+    transform: translateY(-2px);
+  }
+
+  .cat-card__top {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .cat-card__slash {
+    color: var(--accent);
+    font-size: 15px;
+  }
+
+  .cat-card__name {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .cat-card__count {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .cat-card:hover .cat-card__count {
+    color: var(--accent);
+  }
+
+  .cat-card__latest {
+    margin-top: 10px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+</style>

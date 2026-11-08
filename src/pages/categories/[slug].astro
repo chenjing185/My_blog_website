@@ -1,0 +1,50 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import PostCard from '../../components/PostCard.astro';
+import { getPosts, collectCategories, toSlug, type Post } from '../../utils/posts';
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  return collectCategories(posts).map((cat) => ({
+    params: { slug: cat.slug },
+    props: {
+      label: cat.label,
+      posts: posts.filter((p) => p.data.category && toSlug(p.data.category) === cat.slug),
+    },
+  }));
+}
+
+interface Props {
+  label: string;
+  posts: Post[];
+}
+
+const { label, posts } = Astro.props;
+---
+
+<BaseLayout title={`分类：${label}`} description={`分类「${label}」下的全部文章，共 ${posts.length} 篇。`}>
+  <div class="shell">
+    <PageHeader path={`~/categories/${label}`} title={`/${label}`} desc={`${posts.length} 篇文章`} />
+
+    <ul class="post-list">
+      {posts.map((post) => <PostCard post={post} />)}
+    </ul>
+
+    <p class="page-foot mono">
+      <a href="/categories/">← 全部分类</a>
+    </p>
+  </div>
+</BaseLayout>
+
+<style>
+  .page-foot {
+    margin-top: 40px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+
+  .page-foot a:hover {
+    color: var(--accent);
+  }
+</style>

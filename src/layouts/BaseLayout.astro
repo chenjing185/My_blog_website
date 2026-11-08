@@ -3,6 +3,7 @@ import { SITE } from '../consts';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import BaseHead from '../components/BaseHead.astro';
+import CommandPalette from '../components/CommandPalette.astro';
 import '../styles/global.css';
 
 interface Props {
@@ -40,10 +41,13 @@ const { title, description, image, type = 'website', noindex = false } = Astro.p
     </main>
     <Footer />
 
+    <CommandPalette />
+
     <script>
-      // 为每个代码块加「复制」按钮 + 外层容器
-      const blocks = document.querySelectorAll('pre.astro-code');
-      blocks.forEach((pre) => {
+      /* ---------- 1. 代码块：复制按钮 + 长代码折叠 ---------- */
+      const COLLAPSE_HEIGHT = 460;
+
+      document.querySelectorAll('pre.astro-code').forEach((pre) => {
         const wrap = document.createElement('div');
         wrap.className = 'code-wrap';
         pre.parentNode?.insertBefore(wrap, pre);
@@ -71,7 +75,49 @@ const { title, description, image, type = 'website', noindex = false } = Astro.p
         });
 
         wrap.appendChild(btn);
+
+        // 超长代码折叠
+        if (pre.scrollHeight > COLLAPSE_HEIGHT + 80) {
+          wrap.classList.add('is-collapsible');
+
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = 'code-expand mono';
+          toggle.textContent = '展开全部 ↓';
+          toggle.addEventListener('click', () => {
+            const expanded = wrap.classList.toggle('is-expanded');
+            toggle.textContent = expanded ? '收起 ↑' : '展开全部 ↓';
+          });
+          wrap.appendChild(toggle);
+        }
       });
+
+      /* ---------- 2. 正文图片点击放大 ---------- */
+      const figures = document.querySelectorAll<HTMLImageElement>('.prose img');
+
+      if (figures.length > 0) {
+        const overlay = document.createElement('div');
+        overlay.className = 'img-zoom';
+        overlay.innerHTML = '<img alt="" />';
+        document.body.appendChild(overlay);
+
+        const zoomed = overlay.querySelector('img')!;
+        const close = () => overlay.classList.remove('is-open');
+
+        figures.forEach((img) => {
+          img.classList.add('is-zoomable');
+          img.addEventListener('click', () => {
+            zoomed.src = img.currentSrc || img.src;
+            zoomed.alt = img.alt;
+            overlay.classList.add('is-open');
+          });
+        });
+
+        overlay.addEventListener('click', close);
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') close();
+        });
+      }
     </script>
   </body>
 </html>

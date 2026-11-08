@@ -4,6 +4,9 @@ description: 别急着上 Tailwind。一套两百行的设计令牌，足够支�
 pubDate: 2026-10-24
 updatedDate: 2026-10-28
 tags: ['CSS', '设计系统']
+category: 设计
+series: 前端手记
+cover: /covers/theme.svg
 ---
 
 设计令牌（design tokens）这个词听起来很企业，实际上就是把「颜色、间距、字体、圆角」从散落各处的硬编码里抽出来，变成一组有名字的变量。

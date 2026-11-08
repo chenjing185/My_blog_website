@@ -1,0 +1,114 @@
+---
+import type { Post } from '../utils/posts';
+import { entryUrl, isExternalPost } from '../utils/posts';
+import { formatStamp, readingTime } from '../utils/format';
+
+interface Props {
+  posts: Post[];
+}
+
+const { posts } = Astro.props;
+---
+
+{
+  posts.length > 0 && (
+    <section class="related">
+      <h2 class="related__title mono">相关阅读</h2>
+      <ul class="related__list">
+        {posts.map((post) => (
+          <li>
+            <a
+              class="related__item"
+              href={entryUrl(post)}
+              target={isExternalPost(post) ? '_blank' : undefined}
+              rel={isExternalPost(post) ? 'noopener noreferrer' : undefined}
+            >
+              <span class="related__date mono">{formatStamp(post.data.pubDate)}</span>
+              <span class="related__title-text">{post.data.title}</span>
+              <span class="related__meta mono">{readingTime(post.body)} min</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+<style>
+  .related {
+    margin-top: 48px;
+    padding-top: 26px;
+    border-top: 1px solid var(--border);
+  }
+
+  .related__title {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .related__title::before {
+    content: '// ';
+    color: var(--accent);
+    opacity: 0.7;
+  }
+
+  .related__list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .related__item {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: baseline;
+    padding: 10px 10px 10px 12px;
+    margin-left: -12px;
+    border-left: 2px solid transparent;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .related__item:hover {
+    border-left-color: var(--accent);
+    background: linear-gradient(90deg, var(--accent-soft), transparent 70%);
+  }
+
+  .related__date {
+    font-size: 11.5px;
+    color: var(--text-dim);
+  }
+
+  .related__title-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .related__item:hover .related__title-text {
+    color: var(--accent-strong);
+  }
+
+  .related__meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 560px) {
+    .related__item {
+      grid-template-columns: 1fr auto;
+    }
+
+    .related__date {
+      display: none;
+    }
+  }
+</style>

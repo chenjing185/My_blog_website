@@ -1,27 +1,39 @@
 ---
 import type { Post } from '../utils/posts';
-import { postUrl } from '../utils/posts';
+import { entryUrl, isExternalPost } from '../utils/posts';
 import { formatStamp, readingTime } from '../utils/format';
 
 interface Props {
   post: Post;
+  /** 是否显示封面缩略图（默认显示） */
+  cover?: boolean;
 }
 
-const { post } = Astro.props;
-const { title, description, pubDate, tags, draft } = post.data;
+const { post, cover = true } = Astro.props;
+const { title, description, pubDate, tags, draft, pinned, category, cover: coverSrc } = post.data;
 const minutes = readingTime(post.body);
+const external = isExternalPost(post);
 ---
 
-<li class="post-item">
-  <a class="post-item__link" href={postUrl(post)}>
+<li class:list={['post-item', { 'post-item--pinned': pinned }]}>
+  <a
+    class="post-item__link"
+    href={entryUrl(post)}
+    target={external ? '_blank' : undefined}
+    rel={external ? 'noopener noreferrer' : undefined}
+  >
     <time class="post-item__date" datetime={pubDate.toISOString()}>{formatStamp(pubDate)}</time>
+
     <div class="post-item__body">
       <h3 class="post-item__title">
+        {pinned && <span class="pin-badge" title="置顶">置顶</span>}
         {title}
+        {external && <span class="ext-mark" aria-label="外链文章">↗</span>}
         {draft && <span class="draft-badge">draft</span>}
       </h3>
       <p class="post-item__desc">{description}</p>
       <div class="post-item__meta">
+        {category && <span class="post-item__cat">{category}</span>}
         <span>{minutes} min read</span>
         {
           tags.length > 0 && (
@@ -33,12 +45,60 @@ const minutes = readingTime(post.body);
         }
       </div>
     </div>
+
+    {
+      cover && coverSrc && (
+        <img class="post-item__cover" src={coverSrc} alt="" loading="lazy" decoding="async" />
+      )
+    }
   </a>
 </li>
 
 <style>
   .post-item__body {
     min-width: 0;
+  }
+
+  .post-item__link:has(.post-item__cover) {
+    grid-template-columns: 96px minmax(0, 1fr) 132px;
+    align-items: center;
+  }
+
+  .post-item__cover {
+    width: 132px;
+    height: 82px;
+    object-fit: cover;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    filter: saturate(0.85);
+    transition: filter 0.2s, border-color 0.2s;
+  }
+
+  .post-item__link:hover .post-item__cover {
+    filter: saturate(1.05);
+    border-color: var(--accent-line);
+  }
+
+  .pin-badge {
+    display: inline-block;
+    margin-right: 8px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    border-radius: 4px;
+    vertical-align: 2px;
+  }
+
+  .ext-mark {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 0.8em;
+    color: var(--accent);
+    vertical-align: 1px;
   }
 
   .draft-badge {
@@ -55,7 +115,28 @@ const minutes = readingTime(post.body);
     vertical-align: 2px;
   }
 
+  .post-item__cat {
+    color: var(--accent);
+    opacity: 0.85;
+  }
+
+  .post-item__cat::before {
+    content: '/';
+    margin-right: 1px;
+    opacity: 0.6;
+  }
+
   .post-item__tags {
     color: var(--text-dim);
+  }
+
+  @media (max-width: 720px) {
+    .post-item__link:has(.post-item__cover) {
+      grid-template-columns: 1fr;
+    }
+
+    .post-item__cover {
+      display: none;
+    }
   }
 </style>

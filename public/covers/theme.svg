@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="明暗主题配色插画">
+  <defs>
+    <linearGradient id="dark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0c10" />
+      <stop offset="1" stop-color="#12262b" />
+    </linearGradient>
+    <linearGradient id="light" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbfcfd" />
+      <stop offset="1" stop-color="#e6f0ee" />
+    </linearGradient>
+    <pattern id="grid2" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0H0V20" fill="none" stroke="#2dd4bf" stroke-opacity="0.1" stroke-width="1" />
+    </pattern>
+  </defs>
+
+  <rect width="320" height="400" fill="url(#dark)" />
+  <rect width="320" height="400" fill="url(#grid2)" />
+  <rect x="320" width="320" height="400" fill="url(#light)" />
+
+  <circle cx="320" cy="200" r="86" fill="#2dd4bf" opacity="0.18" />
+  <circle cx="320" cy="200" r="52" fill="#2dd4bf" opacity="0.28" />
+
+  <g fill="none" stroke-width="2">
+    <path d="M320 96v-40" stroke="#2dd4bf" opacity="0.5" />
+    <path d="M320 344v40" stroke="#2dd4bf" opacity="0.5" />
+  </g>
+
+  <circle cx="320" cy="200" r="26" fill="#0f141a" stroke="#5eead4" stroke-width="3" />
+
+  <rect x="56" y="72" width="34" height="34" rx="8" fill="#2dd4bf" opacity="0.9" />
+  <rect x="100" y="72" width="34" height="34" rx="8" fill="#e6edf3" opacity="0.55" />
+  <rect x="144" y="72" width="34" height="34" rx="8" fill="#3a4a56" />
+  <rect x="188" y="72" width="34" height="34" rx="8" fill="#1d2530" />
+
+  <rect x="56" y="300" width="92" height="12" rx="6" fill="#1d2530" />
+  <rect x="56" y="326" width="140" height="12" rx="6" fill="#1d2530" opacity="0.6" />
+
+  <rect x="404" y="72" width="34" height="34" rx="8" fill="#0d9488" opacity="0.9" />
+  <rect x="448" y="72" width="34" height="34" rx="8" fill="#12181d" opacity="0.75" />
+  <rect x="492" y="72" width="34" height="34" rx="8" fill="#cdd3cf" />
+  <rect x="536" y="72" width="34" height="34" rx="8" fill="#e2e5e3" stroke="#cdd3cf" />
+
+  <rect x="404" y="300" width="92" height="12" rx="6" fill="#e2e5e3" />
+  <rect x="404" y="326" width="140" height="12" rx="6" fill="#e2e5e3" opacity="0.7" />
+</svg>

@@ -3,6 +3,8 @@ title: Astro 内容集合：把 Markdown 当成数据库
 description: 用 schema 校验 frontmatter，用 glob loader 读取目录，用 getCollection 查询、排序、过滤——以及几个容易踩的坑。
 pubDate: 2026-11-02
 tags: ['Astro', 'TypeScript']
+category: 技术
+series: 建站笔记
 ---
 
 Astro 的内容集合（Content Collections）本质上是一个**构建期的简易 ORM**：目录是表，文件是行，frontmatter 是列，而 `zod` schema 是建表语句。

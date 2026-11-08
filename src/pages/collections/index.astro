@@ -1,0 +1,133 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { getPosts, collectSeries } from '../../utils/posts';
+import { formatStamp } from '../../utils/format';
+
+const posts = await getPosts();
+const seriesList = collectSeries(posts);
+const total = seriesList.reduce((n, s) => n + s.posts.length, 0);
+---
+
+<BaseLayout title="专栏" description="成系列的文章集合，按阅读顺序排列。">
+  <div class="shell">
+    <PageHeader
+      path="~/collections"
+      title="专栏"
+      desc={`${seriesList.length} 个专栏 · ${total} 篇文章`}
+    />
+
+    {
+      seriesList.length > 0 ? (
+        <ul class="col-grid">
+          {seriesList.map((series) => {
+            const latest = series.posts[series.posts.length - 1];
+            return (
+              <li>
+                <a class="col-card" href={`/collections/${series.slug}/`}>
+                  <div class="col-card__head">
+                    <span class="col-card__label mono">collection</span>
+                    <span class="col-card__count mono">{series.posts.length} 篇</span>
+                  </div>
+                  <h2 class="col-card__name">{series.label}</h2>
+                  <ol class="col-card__list">
+                    {series.posts.slice(0, 3).map((post) => (
+                      <li class="mono">{post.data.title}</li>
+                    ))}
+                    {series.posts.length > 3 && (
+                      <li class="mono dim">… 还有 {series.posts.length - 3} 篇</li>
+                    )}
+                  </ol>
+                  <div class="col-card__foot mono">
+                    <span class="dim">更新于</span> {formatStamp(latest.data.pubDate)}
+                  </div>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p class="muted mono">还没有专栏，在文章 frontmatter 里加 series 字段即可自动聚合。</p>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .col-grid {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  .col-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    transition: border-color 0.18s, background 0.18s, transform 0.18s;
+  }
+
+  .col-card:hover {
+    border-color: var(--accent-line);
+    background: var(--accent-soft);
+    transform: translateY(-2px);
+  }
+
+  .col-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .col-card__label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    opacity: 0.75;
+  }
+
+  .col-card__count {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .col-card__name {
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .col-card__list {
+    margin: 12px 0 0;
+    padding-left: 18px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.9;
+  }
+
+  .col-card__list li::marker {
+    color: var(--text-dim);
+  }
+
+  .col-card__list li {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .col-card__foot {
+    margin-top: auto;
+    padding-top: 14px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+</style>

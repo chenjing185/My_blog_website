@@ -3,6 +3,8 @@ title: 我的终端工具链，2026 版
 description: 从 zsh 到 ripgrep，从 fzf 到 zoxide。只保留每天真的会敲的那十几个命令。
 pubDate: 2026-10-12
 tags: ['工具链', '效率']
+category: 工具
+series: 终端效率
 ---
 
 每年清理一次 dotfiles。规则很简单：**三个月没用过的配置，删掉**。

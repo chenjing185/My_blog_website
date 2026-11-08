@@ -3,6 +3,10 @@ title: 为什么我又开了一个博客
 description: 第十二次重启博客。这次不谈「坚持」，只谈怎么把写作的摩擦力降到最低。
 pubDate: 2026-11-07
 tags: ['随笔', 'Astro']
+category: 随笔
+series: 建站笔记
+pinned: true
+cover: /covers/terminal.svg
 ---
 
 这大概是我第十二次搭博客。前十一套方案分别死于：主题改到凌晨三点、数据库迁移失败、以及「等我想好第一篇文章再上线」。

@@ -1,0 +1,44 @@
+---
+interface Props {
+  /** 面包屑路径，如 '~/archives' */
+  path: string;
+  title: string;
+  desc?: string;
+}
+
+const { path: crumb, title, desc } = Astro.props;
+---
+
+<header class="page-head">
+  <p class="page-head__path mono">
+    <span class="dim">~/</span>{crumb.replace(/^~\//, '')}<span class="dim">/</span>
+  </p>
+  <h1 class="page-head__title">{title}</h1>
+  {desc && <p class="page-head__desc mono">{desc}</p>}
+  <slot />
+</header>
+
+<style>
+  .page-head {
+    margin-bottom: 40px;
+  }
+
+  .page-head__path {
+    font-size: 12.5px;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+
+  .page-head__title {
+    font-family: var(--font-mono);
+    font-size: clamp(1.6rem, 3vw, 2.1rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .page-head__desc {
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+</style>

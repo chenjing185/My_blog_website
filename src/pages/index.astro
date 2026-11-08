@@ -2,13 +2,16 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PostCard from '../components/PostCard.astro';
 import { SITE, LATEST_POSTS } from '../consts';
-import { getPosts, collectTags } from '../utils/posts';
+import { getPosts, collectTags, collectCategories, collectSeries } from '../utils/posts';
 import { formatDate } from '../utils/format';
 
 const posts = await getPosts();
-const latest = posts.slice(0, LATEST_POSTS);
+const pinned = posts.filter((p) => p.data.pinned);
+const latest = posts.filter((p) => !p.data.pinned).slice(0, LATEST_POSTS);
 const allTags = collectTags(posts);
 const tags = allTags.slice(0, 10);
+const categories = collectCategories(posts);
+const seriesList = collectSeries(posts);
 const updated = posts[0]?.data.pubDate;
 ---
 
@@ -31,8 +34,9 @@ const updated = posts[0]?.data.pubDate;
 
         <ul class="hero__stats mono">
           <li><span class="hero__num">{posts.length}</span> posts</li>
+          <li><span class="hero__num">{categories.length}</span> cats</li>
+          <li><span class="hero__num">{seriesList.length}</span> series</li>
           <li><span class="hero__num">{allTags.length}</span> tags</li>
-          <li><span class="hero__num">{SITE.since}</span> since</li>
         </ul>
       </div>
 
@@ -59,6 +63,22 @@ const updated = posts[0]?.data.pubDate;
       </div>
     </section>
 
+    {
+      pinned.length > 0 && (
+        <section class="home-section">
+          <div class="home-section__head">
+            <h2 class="section-label">pinned</h2>
+            <span class="mono home-section__more dim">{pinned.length} 篇</span>
+          </div>
+          <ul class="post-list">
+            {pinned.map((post) => (
+              <PostCard post={post} />
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
     <section class="home-section">
       <div class="home-section__head">
         <h2 class="section-label">latest</h2>
@@ -77,6 +97,34 @@ const updated = posts[0]?.data.pubDate;
         )
       }
     </section>
+
+    {
+      seriesList.length > 0 && (
+        <section class="home-section">
+          <div class="home-section__head">
+            <h2 class="section-label">collections</h2>
+            <a class="mono home-section__more" href="/collections/">
+              all series →
+            </a>
+          </div>
+          <ul class="series-strip">
+            {seriesList.map((item) => (
+              <li>
+                <a class="series-strip__item" href={`/collections/${item.slug}/`}>
+                  <span class="series-strip__top">
+                    <span class="series-strip__name">{item.label}</span>
+                    <span class="series-strip__count mono">{item.posts.length} 篇</span>
+                  </span>
+                  <span class="series-strip__latest mono">
+                    {item.posts[item.posts.length - 1]?.data.title}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
 
     {
       allTags.length > 0 && (
@@ -206,6 +254,59 @@ const updated = posts[0]?.data.pubDate;
 
   .tag:hover .tag__count {
     color: var(--accent);
+  }
+
+  .series-strip {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+
+  .series-strip__item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .series-strip__item:hover {
+    border-color: var(--accent-line);
+    background: var(--accent-soft);
+  }
+
+  .series-strip__top {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .series-strip__name {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .series-strip__count {
+    margin-left: auto;
+    font-size: 10.5px;
+    color: var(--text-dim);
+  }
+
+  .series-strip__latest {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
 
   @media (max-width: 900px) {

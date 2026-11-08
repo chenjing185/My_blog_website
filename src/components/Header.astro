@@ -28,13 +28,60 @@ function isActive(href: string): boolean {
     </nav>
 
     <div class="header-actions">
-      <a class="icon-btn" href="/search/" aria-label="搜索文章" title="搜索 ( / )">
+      <button
+        class="search-trigger"
+        type="button"
+        data-open-cmdk
+        aria-label="搜索文章（Ctrl K）"
+        title="搜索 ( Ctrl K )"
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <circle cx="11" cy="11" r="7"></circle>
           <path d="m20 20-3.5-3.5"></path>
         </svg>
-      </a>
+        <span class="search-trigger__kbd">⌘K</span>
+      </button>
       <ThemeToggle />
     </div>
   </div>
 </header>
+
+<style>
+  .search-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .search-trigger:hover {
+    color: var(--accent);
+    background: var(--surface);
+  }
+
+  .search-trigger svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .search-trigger__kbd {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0 4px;
+    background: var(--surface-2);
+  }
+
+  @media (max-width: 860px) {
+    .search-trigger__kbd {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,191 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { getPosts, groupByMonth, entryUrl, isExternalPost } from '../../utils/posts';
+import { formatDate, readingTime } from '../../utils/format';
+
+const posts = await getPosts();
+const groups = groupByMonth(posts);
+const span = groups.length > 1 ? `${groups[groups.length - 1].year}–${groups[0].year}` : `${groups[0]?.year ?? ''}`;
+---
+
+<BaseLayout title="归档" description="全部文章的时间轴归档，按年月排列。">
+  <div class="shell">
+    <PageHeader
+      path="~/archives"
+      title="归档"
+      desc={`共 ${posts.length} 篇 · ${span}`}
+    />
+
+    {
+      groups.map(({ year, months }) => (
+        <section class="year">
+          <div class="year__head">
+            <h2 class="year__title">{year}</h2>
+            <span class="year__count mono">
+              {months.reduce((n, m) => n + m.posts.length, 0)} 篇
+            </span>
+            <span class="year__line" />
+          </div>
+
+          {months.map(({ month, posts: list }) => (
+            <div class="month">
+              <h3 class="month__title mono">{String(month).padStart(2, '0')} 月</h3>
+              <ul class="timeline">
+                {list.map((post) => {
+                  const external = isExternalPost(post);
+                  return (
+                    <li class="timeline__item">
+                      <time class="timeline__date mono" datetime={post.data.pubDate.toISOString()}>
+                        {formatDate(post.data.pubDate).slice(5)}
+                      </time>
+                      <a
+                        class="timeline__title"
+                        href={entryUrl(post)}
+                        target={external ? '_blank' : undefined}
+                        rel={external ? 'noopener noreferrer' : undefined}
+                      >
+                        {post.data.title}
+                        {external && <span class="timeline__ext">↗</span>}
+                      </a>
+                      <span class="timeline__meta mono">
+                        {post.data.category && <span class="timeline__cat">{post.data.category}</span>}
+                        {readingTime(post.body)} min
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </section>
+      ))
+    }
+
+    {posts.length === 0 && <p class="muted mono">还没有文章。</p>}
+  </div>
+</BaseLayout>
+
+<style>
+  .year + .year {
+    margin-top: 48px;
+  }
+
+  .year__head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .year__title {
+    font-family: var(--font-mono);
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .year__count {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .year__line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .month + .month {
+    margin-top: 24px;
+  }
+
+  .month__title {
+    font-size: 11.5px;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    padding-left: 2px;
+  }
+
+  .timeline {
+    list-style: none;
+    padding: 0 0 0 20px;
+    margin: 0;
+    border-left: 1px solid var(--border);
+  }
+
+  .timeline__item {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 8px 0;
+  }
+
+  .timeline__item::before {
+    content: '';
+    position: absolute;
+    left: -25px;
+    top: 17px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border-strong);
+    border: 1px solid var(--bg);
+    transition: background 0.2s;
+  }
+
+  .timeline__item:hover::before {
+    background: var(--accent);
+  }
+
+  .timeline__date {
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    min-width: 42px;
+  }
+
+  .timeline__title {
+    font-size: 14.5px;
+    color: var(--text);
+    line-height: 1.6;
+    transition: color 0.15s;
+  }
+
+  .timeline__item:hover .timeline__title {
+    color: var(--accent-strong);
+  }
+
+  .timeline__ext {
+    margin-left: 5px;
+    font-size: 0.8em;
+    color: var(--accent);
+  }
+
+  .timeline__meta {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .timeline__cat {
+    color: var(--accent);
+    opacity: 0.8;
+    margin-right: 8px;
+  }
+
+  @media (max-width: 600px) {
+    .timeline__item {
+      flex-wrap: wrap;
+      gap: 6px 12px;
+    }
+
+    .timeline__meta {
+      margin-left: 56px;
+      width: 100%;
+    }
+  }
+</style>

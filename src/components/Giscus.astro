@@ -1,0 +1,111 @@
+---
+import { GISCUS } from '../consts';
+
+const enabled = Boolean(GISCUS.repo && GISCUS.repoId && GISCUS.categoryId);
+const isDev = import.meta.env.DEV;
+---
+
+{
+  enabled ? (
+    <section class="comments" id="comments">
+      <h2 class="comments__title mono">评论</h2>
+      <div class="giscus-wrap">
+        <script
+          is:inline
+          src="https://giscus.app/client.js"
+          data-repo={GISCUS.repo}
+          data-repo-id={GISCUS.repoId}
+          data-category={GISCUS.category}
+          data-category-id={GISCUS.categoryId}
+          data-mapping="pathname"
+          data-strict="0"
+          data-reactions-enabled="1"
+          data-emit-metadata="0"
+          data-input-position="top"
+          data-theme="dark"
+          data-lang="zh-CN"
+          data-loading="lazy"
+          crossorigin="anonymous"
+          async
+        />
+      </div>
+    </section>
+  ) : (
+    isDev && (
+      <section class="comments comments--disabled">
+        <p class="mono">
+          评论未启用：在 <code>src/consts.ts</code> 的 <code>GISCUS</code> 里填入 repo / repoId /
+          categoryId 即可（步骤见文件注释）。
+        </p>
+      </section>
+    )
+  )
+}
+
+<script>
+  // Giscus 主题跟随站点的明暗切换
+  const isLight = () => document.documentElement.dataset.theme === 'light';
+
+  const syncTheme = () => {
+    const frame = document.querySelector<HTMLIFrameElement>('iframe.giscus-frame');
+    if (!frame?.contentWindow) return;
+    frame.contentWindow.postMessage(
+      { giscus: { setConfig: { theme: isLight() ? 'light' : 'dark' } } },
+      'https://giscus.app'
+    );
+  };
+
+  // iframe 是异步插入的，监听 DOM 变化直到它出现
+  const observer = new MutationObserver(() => {
+    if (document.querySelector('iframe.giscus-frame')) syncTheme();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // 主题按钮点击后 html[data-theme] 变化，同步给 iframe
+  new MutationObserver(syncTheme).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
+
+  window.addEventListener('message', (event) => {
+    if (event.origin !== 'https://giscus.app') return;
+    // giscus 加载完成后主动握手一次，避免首屏主题不同步
+    syncTheme();
+  });
+</script>
+
+<style>
+  .comments {
+    margin-top: 56px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+  }
+
+  .comments__title {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+
+  .comments__title::before {
+    content: '// ';
+    color: var(--accent);
+    opacity: 0.7;
+  }
+
+  .comments--disabled {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    line-height: 1.9;
+  }
+
+  .comments--disabled code {
+    font-family: var(--font-mono);
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+</style>

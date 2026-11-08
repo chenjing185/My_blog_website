@@ -1,10 +1,15 @@
 ---
-import { SITE } from '../consts';
+import { SITE, STATS } from '../consts';
 
 const year = new Date().getFullYear();
 const range = year > SITE.since ? `${SITE.since}–${year}` : `${SITE.since}`;
 
+/** 建站天数（按建站年份 1 月 1 日算） */
+const sinceDate = new Date(Date.UTC(SITE.since, 0, 1));
+const days = Math.max(1, Math.floor((Date.now() - sinceDate.getTime()) / 86400000));
+
 const isExternal = (href: string) => href.startsWith('http');
+const showStats = STATS.enabled && STATS.showSiteStats;
 ---
 
 <footer class="site-footer">
@@ -25,4 +30,85 @@ const isExternal = (href: string) => href.startsWith('http');
       <span class="dim">built with astro</span>
     </div>
   </div>
+
+  <div class="shell site-footer__meta mono">
+    <span class="footer-stat">已运行 <em>{days}</em> 天</span>
+
+    {
+      showStats && (
+        <span class="footer-stat" id="site-stats" hidden>
+          总访问 <em id="busuanzi_value_site_pv">—</em>
+          <span class="dim">/</span>
+          访客 <em id="busuanzi_value_site_uv">—</em>
+        </span>
+      )
+    }
+
+    <a class="footer-stat footer-stat--link" href="/rss.xml">rss</a>
+  </div>
+
+  {
+    STATS.enabled && (
+      <script
+        is:inline
+        src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"
+        async
+        defer
+      />
+    )
+  }
 </footer>
+
+<script>
+  // 不蒜子偶发不可用（网络/服务抖动），拿不到数据就整块隐藏，避免页脚出现「—」
+  const block = document.getElementById('site-stats');
+  if (block) {
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      const pv = document.getElementById('busuanzi_value_site_pv')?.textContent?.trim();
+      const uv = document.getElementById('busuanzi_value_site_uv')?.textContent?.trim();
+      const ready = pv && pv !== '—' && uv && uv !== '—';
+
+      if (ready) {
+        block.hidden = false;
+        window.clearInterval(timer);
+      } else if (++tries > 20) {
+        window.clearInterval(timer);
+      }
+    }, 300);
+  }
+</script>
+
+<style>
+  .site-footer__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 18px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+    font-size: 11.5px;
+    color: var(--text-dim);
+  }
+
+  .footer-stat em {
+    font-style: normal;
+    color: var(--text-muted);
+  }
+
+  .footer-stat--link {
+    margin-left: auto;
+    transition: color 0.15s;
+  }
+
+  .footer-stat--link:hover {
+    color: var(--accent);
+  }
+
+  @media (max-width: 560px) {
+    .footer-stat--link {
+      margin-left: 0;
+    }
+  }
+</style>
