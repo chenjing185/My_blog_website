@@ -45,10 +45,10 @@ export const LATEST_POSTS = 5;
  *   4. 填到下面，重新构建即可。留空则整块评论不渲染。
  */
 export const GISCUS = {
-  repo: '', // 例如 'lastembryo/myblog'
-  repoId: '', // 例如 'R_kgDOxxxxxx'
+  repo: 'chenjing185/My_blog_website', // 例如 'lastembryo/myblog'
+  repoId: 'R_kgDOVmw5LQ', // 例如 'R_kgDOxxxxxx'
   category: 'Announcements',
-  categoryId: '', // 例如 'DIC_kwDOxxxxxx'
+  categoryId: 'DIC_kwDOVmw5Lc4DKpFQ', // 例如 'DIC_kwDOxxxxxx'
 };
 
 /** 站点统计（不蒜子，免费、无需注册） */
