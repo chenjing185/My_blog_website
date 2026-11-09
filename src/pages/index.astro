@@ -67,7 +67,7 @@ const updated = posts[0]?.data.pubDate;
       pinned.length > 0 && (
         <section class="home-section">
           <div class="home-section__head">
-            <h2 class="section-label">pinned</h2>
+            <h2 class="section-label">置顶</h2>
             <span class="mono home-section__more dim">{pinned.length} 篇</span>
           </div>
           <ul class="post-list">
@@ -81,8 +81,8 @@ const updated = posts[0]?.data.pubDate;
 
     <section class="home-section">
       <div class="home-section__head">
-        <h2 class="section-label">latest</h2>
-        <a class="mono home-section__more" href="/blog/">all posts →</a>
+        <h2 class="section-label">最新</h2>
+        <a class="mono home-section__more" href="/blog/">全部文章 →</a>
       </div>
 
       {
@@ -102,9 +102,9 @@ const updated = posts[0]?.data.pubDate;
       seriesList.length > 0 && (
         <section class="home-section">
           <div class="home-section__head">
-            <h2 class="section-label">collections</h2>
+            <h2 class="section-label">专栏</h2>
             <a class="mono home-section__more" href="/collections/">
-              all series →
+              所有系列 →
             </a>
           </div>
           <ul class="series-strip">
@@ -130,9 +130,9 @@ const updated = posts[0]?.data.pubDate;
       allTags.length > 0 && (
         <section class="home-section">
           <div class="home-section__head">
-            <h2 class="section-label">tags</h2>
+            <h2 class="section-label">标签</h2>
             <a class="mono home-section__more" href="/tags/">
-              all tags →
+              全部标签 →
             </a>
           </div>
           <ul class="tag-list">
