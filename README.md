@@ -21,7 +21,7 @@ npm run build      # 产物在 dist/
 npm run preview    # 本地预览产物
 ```
 
-> 首次 `npm install` 如果很慢，是 registry 拉取元数据的问题，可以换镜像：
+> 首次 `npm install` 如果很慢，是 registry 拉取元数据的问题，可以换镜像：  
 > `npm install --registry=https://registry.npmmirror.com`
 
 ## 目录结构
@@ -78,20 +78,20 @@ cover: /images/xxx.jpg     # 可选，列表缩略图 + og:image
 正文用 Markdown 写。
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `title` | string | ✅ | 最长 120 字符 |
-| `description` | string | ✅ | 最长 300 字符 |
-| `pubDate` | date | ✅ | `YYYY-MM-DD` |
-| `updatedDate` | date | | 显示「更新于」 |
-| `category` | string | | 单值分类，自动生成 `/categories/<slug>/` |
-| `tags` | string[] | | 默认空数组 |
-| `series` | string | | 同名聚合为专栏，文章页显示进度与同系列上下篇 |
-| `pinned` | boolean | | 置顶到首页「pinned」区，列表卡片带标记 |
-| `draft` | boolean | | 默认 `false` |
-| `link` | url | | 外链文章：列表卡直接跳外链，详情页展示跳转提示 |
-| `cover` | string | | 列表缩略图，也用作 og:image |
-| `subtitle` | string | | 标题下的补充说明 |
+| 字段            | 类型       | 必填 | 说明                              |
+| ------------- | -------- | -- | ------------------------------- |
+| `title`       | string   | ✅  | 最长 120 字符                       |
+| `description` | string   | ✅  | 最长 300 字符                       |
+| `pubDate`     | date     | ✅  | `YYYY-MM-DD`                    |
+| `updatedDate` | date     |    | 显示「更新于」                         |
+| `category`    | string   |    | 单值分类，自动生成 `/categories/<slug>/` |
+| `tags`        | string[] |    | 默认空数组                           |
+| `series`      | string   |    | 同名聚合为专栏，文章页显示进度与同系列上下篇          |
+| `pinned`      | boolean  |    | 置顶到首页「pinned」区，列表卡片带标记          |
+| `draft`       | boolean  |    | 默认 `false`                      |
+| `link`        | url      |    | 外链文章：列表卡直接跳外链，详情页展示跳转提示         |
+| `cover`       | string   |    | 列表缩略图，也用作 og:image              |
+| `subtitle`    | string   |    | 标题下的补充说明                        |
 
 字段写错会在构建时直接报错——这是有意为之，避免线上出现空标题。
 
@@ -158,13 +158,11 @@ dist/            产物目录（publish）
 1. 把仓库推到 GitHub / GitLab / Gitee
 2. Netlify 控制台 → **Add new site → Import an existing project** → 选择仓库
 3. 构建配置会被 `netlify.toml` 自动读取，直接点 **Deploy**：
-
-   | 项 | 值 |
-   | --- | --- |
-   | Build command | `npm run build` |
-   | Publish directory | `dist` |
-   | Node version | `22` |
-
+   | 项                 | 值                 |
+   | ----------------- | ----------------- |
+   | Build command     | `  npm run build` |
+   | Publish directory | `dist`            |
+   | Node version      | `22`              |
 4. 约 1 分钟构建完成，拿到 `https://<随机名>.netlify.app`
 5. 想改地址：**Site configuration → Change site name**
 
@@ -282,12 +280,12 @@ export const STATS = {
 
 ## 命令
 
-| 命令 | 作用 |
-| --- | --- |
-| `npm run dev` | 启动开发服务器（热更新） |
-| `npm run build` | 构建到 `dist/` |
-| `npm run preview` | 预览构建产物 |
-| `npm run check` | TypeScript / Astro 类型检查 |
+| 命令                | 作用                      |
+| ----------------- | ----------------------- |
+| `npm run dev`     | 启动开发服务器（热更新）            |
+| `npm run build`   | 构建到 `dist/`             |
+| `npm run preview` | 预览构建产物                  |
+| `npm run check`   | TypeScript / Astro 类型检查 |
 
 ## 环境说明
 
