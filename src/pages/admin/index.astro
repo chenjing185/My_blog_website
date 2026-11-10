@@ -1,0 +1,307 @@
+---
+/**
+ * 手机写作台。
+ * 纯前端页面：调用 GitHub REST API 直接提交 Markdown，Netlify 收到推送后自动重新构建。
+ * 令牌只存在访问者浏览器的 localStorage，不经过任何第三方服务。
+ */
+import '../../styles/admin.css';
+---
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>箱中世界 · 写作台</title>
+    <meta name="description" content="在手机上写这个 Astro 博客：提交即部署。" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#0a0c10" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="写作台" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="manifest" href="/admin/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/admin/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script is:inline>
+      // 首屏前应用主题，避免闪一下白
+      (() => {
+        try {
+          const saved = localStorage.getItem('czw.admin.theme');
+          if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
+        } catch {}
+      })();
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="/" aria-label="回到站点首页">
+          <span class="brand-dot" aria-hidden="true"></span>
+          <span>箱中世界</span>
+          <span class="brand-sub">写作台</span>
+        </a>
+        <div class="topbar-actions">
+          <span id="conn-dot" class="dot" title="未连接" aria-label="连接状态"></span>
+          <button id="btn-theme" class="icon-btn" type="button" aria-label="切换白天/夜间" title="切换白天/夜间">◐</button>
+          <button id="btn-settings" class="icon-btn" type="button" aria-label="设置" title="设置">⚙</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="app">
+      <p id="demo-banner" class="banner warn" hidden>
+        演示模式：数据只存在这个页面里，不会写入仓库。<a href="/admin/">退出演示</a>
+      </p>
+      <p id="offline-banner" class="banner warn" hidden>当前离线，保存会失败；正文会先留在本机草稿里。</p>
+
+      <section id="view-boot" class="view">
+        <p class="muted small">正在连接…</p>
+      </section>
+
+      <section id="view-setup" class="view" hidden>
+        <div class="hero">
+          <h1>连接你的 GitHub 仓库</h1>
+          <p class="muted">
+            写作台直接调用 GitHub API，把文章提交到 <code>src/content/blog/</code>。Netlify 收到推送后会自动重新构建，
+            通常一分钟内就能在你博客上看到。令牌只保存在这台设备的浏览器里，不会进仓库。
+          </p>
+        </div>
+
+        <form id="setup-form" class="card">
+          <label class="field">
+            <span>访问令牌（Personal Access Token）</span>
+            <input
+              id="setup-token"
+              type="password"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="github_pat_…"
+            />
+          </label>
+
+          <details class="hint">
+            <summary>怎么生成这个令牌？</summary>
+            <ol>
+              <li>
+                手机浏览器打开
+                <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">
+                  github.com/settings/personal-access-tokens/new
+                </a>
+                （需要先登录 GitHub）
+              </li>
+              <li>Token name 随便填，Expiration 按需要选一个到期时间</li>
+              <li>Repository access 选 <strong>Only select repositories</strong>，只勾 <code>chenjing185/My_blog_website</code></li>
+              <li>
+                Permissions → Repository permissions → <strong>Contents</strong> 设为 <strong>Read and write</strong>
+                （Metadata 会自动变成只读）
+              </li>
+              <li>点页面最下面的 Generate token，复制 <code>github_pat_…</code> 粘到上面</li>
+            </ol>
+            <p class="muted small">
+              令牌相当于密码：只贴在这台设备上；万一泄露，去 GitHub 同一个页面吊销即可。
+            </p>
+          </details>
+
+          <p id="setup-error" class="error" hidden></p>
+          <button id="setup-submit" class="btn primary block" type="submit">连接并开始</button>
+        </form>
+
+        <p class="muted small">
+          想先看看界面？<a class="link" href="/admin/?demo=1">打开演示模式</a>（不联网、不写仓库）。
+        </p>
+      </section>
+
+      <section id="view-list" class="view" hidden>
+        <div class="list-toolbar">
+          <input id="search" class="search" type="search" placeholder="搜索标题、摘要、标签" autocomplete="off" />
+          <button id="btn-refresh" class="btn" type="button">刷新</button>
+          <button id="btn-new" class="btn primary" type="button">新建</button>
+        </div>
+        <p id="list-meta" class="muted small"></p>
+        <ul id="post-list" class="post-list"></ul>
+        <p id="list-empty" class="empty" hidden>还没有文章，点右上角「新建」开始写吧。</p>
+        <p id="list-error" class="error" hidden></p>
+      </section>
+
+      <section id="view-edit" class="view" hidden>
+        <form id="edit-form" class="editor" novalidate>
+          <div class="editor-head">
+            <button id="btn-back" class="btn small" type="button">返回</button>
+            <span id="editor-status" class="muted small">新文章</span>
+            <button id="btn-save" class="btn primary small" type="submit">保存</button>
+          </div>
+
+          <label class="field">
+            <span>标题</span>
+            <input id="f-title" type="text" maxlength="120" placeholder="给这篇文章起个名字" />
+          </label>
+
+          <label class="field">
+            <span>摘要（列表和搜索里会用到，最多 300 字）</span>
+            <textarea id="f-desc" rows="2" maxlength="300" placeholder="一两句话说明这篇在讲什么"></textarea>
+          </label>
+
+          <div class="grid-2">
+            <label class="field">
+              <span>发布日期</span>
+              <input id="f-pubdate" type="date" />
+            </label>
+            <label class="field">
+              <span>更新日期（可空）</span>
+              <input id="f-updated" type="date" />
+            </label>
+          </div>
+
+          <details id="more-fields" class="more card">
+            <summary>更多设置</summary>
+            <div class="more-body">
+              <label class="field">
+                <span>分类</span>
+                <input id="f-category" type="text" placeholder="随笔" />
+              </label>
+              <label class="field">
+                <span>标签（逗号分隔）</span>
+                <input id="f-tags" type="text" placeholder="随笔, Astro" />
+              </label>
+              <label class="field">
+                <span>专栏</span>
+                <input id="f-series" type="text" placeholder="建站笔记" />
+              </label>
+              <label class="field">
+                <span>文件名（决定网址，别轻易改）</span>
+                <input id="f-slug" type="text" placeholder="my-post" autocapitalize="off" spellcheck="false" />
+              </label>
+              <label class="field">
+                <span>封面图</span>
+                <input id="f-cover" type="text" placeholder="/uploads/2026-11/xx.jpg" />
+              </label>
+              <div class="row">
+                <button id="btn-cover-upload" class="btn small" type="button">上传封面</button>
+                <span id="cover-status" class="muted small"></span>
+              </div>
+              <label class="field">
+                <span>外链（可选，填了正文就只做导读）</span>
+                <input id="f-link" type="url" placeholder="https://…" />
+              </label>
+              <label class="field">
+                <span>副标题（可选）</span>
+                <input id="f-subtitle" type="text" />
+              </label>
+            </div>
+          </details>
+
+          <div class="switches">
+            <label class="switch">
+              <input id="f-draft" type="checkbox" />
+              <span>存为草稿（draft: true，不发布）</span>
+            </label>
+            <label class="switch">
+              <input id="f-pinned" type="checkbox" />
+              <span>置顶</span>
+            </label>
+          </div>
+
+          <div class="body-toolbar">
+            <div class="md-tools" role="toolbar" aria-label="Markdown 工具">
+              <button type="button" data-insert="heading" title="小标题">H2</button>
+              <button type="button" data-insert="bold" title="粗体"><b>B</b></button>
+              <button type="button" data-insert="italic" title="斜体"><i>I</i></button>
+              <button type="button" data-insert="list" title="列表">列表</button>
+              <button type="button" data-insert="quote" title="引用">引用</button>
+              <button type="button" data-insert="code" title="代码">代码</button>
+              <button type="button" data-insert="link" title="链接">链接</button>
+              <button type="button" data-insert="image" title="图片">图片</button>
+              <button type="button" data-insert="hr" title="分隔线">分隔线</button>
+            </div>
+            <button id="btn-preview" class="btn small" type="button">预览</button>
+          </div>
+
+          <textarea id="f-body" class="body" rows="16" placeholder="正文，支持 Markdown…" spellcheck="false"></textarea>
+          <div id="preview" class="prose preview" hidden></div>
+
+          <div class="meta-row">
+            <span id="word-count" class="muted small">0 字</span>
+            <div class="more-actions">
+              <button id="btn-view-file" class="btn small" type="button" hidden>查看 GitHub 文件</button>
+              <button id="btn-delete" class="btn small danger" type="button" hidden>删除文章</button>
+            </div>
+          </div>
+
+          <p id="save-error" class="error" hidden></p>
+          <input id="image-file" type="file" accept="image/*" hidden />
+          <input id="cover-file" type="file" accept="image/*" hidden />
+        </form>
+      </section>
+
+      <section id="view-settings" class="view" hidden>
+        <h1 class="page-title">设置</h1>
+        <form id="settings-form" class="card">
+          <label class="field">
+            <span>仓库所有者（owner）</span>
+            <input id="s-owner" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>仓库名</span>
+            <input id="s-repo" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>分支</span>
+            <input id="s-branch" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>文章目录</span>
+            <input id="s-dir" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>访问令牌</span>
+            <input id="s-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          </label>
+          <div class="row">
+            <button id="btn-test" class="btn" type="button">测试连接</button>
+            <button id="btn-save-settings" class="btn primary" type="button">保存</button>
+          </div>
+          <p id="settings-status" class="muted small"></p>
+          <p id="settings-error" class="error" hidden></p>
+        </form>
+
+        <div class="card">
+          <h2 class="card-title">说明</h2>
+          <p class="muted small">令牌保存在本机浏览器的 localStorage。换手机或清缓存后需要重新粘贴。</p>
+          <p class="muted small">
+            保存文章 = 向 GitHub 提交一个 commit。Netlify 检测到分支更新后会自动构建，通常 1 分钟内生效。
+          </p>
+          <p class="muted small">
+            文章文件：<code>src/content/blog/&lt;文件名&gt;.md</code>；图片：<code>public/uploads/年-月/</code>。
+          </p>
+          <p class="muted small">
+            完整步骤见仓库里的 <code>docs/手机写博客.md</code>，或打开
+            <a class="link" href="https://github.com/chenjing185/My_blog_website" target="_blank" rel="noopener noreferrer">GitHub 仓库</a>。
+          </p>
+        </div>
+
+        <div class="card danger-zone">
+          <h2 class="card-title">危险操作</h2>
+          <p class="muted small">断开连接只会清掉本机的令牌，不影响仓库里的文章。</p>
+          <button id="btn-disconnect" class="btn danger" type="button">断开连接</button>
+        </div>
+
+        <p class="muted small"><a class="link" href="/">← 回到站点首页</a></p>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <div id="modal" class="modal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <h2 id="modal-title"></h2>
+        <p id="modal-text"></p>
+        <div id="modal-actions" class="modal-actions"></div>
+      </div>
+    </div>
+
+    <script>
+      import '../../scripts/admin/main.js';
+    </script>
+  </body>
+</html>

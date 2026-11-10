@@ -45,12 +45,14 @@ npm run preview    # 本地预览产物
     │   ├── categories/      # 分类总览 + [slug] 分类页
     │   ├── collections/     # 专栏总览 + [slug] 专栏目录
     │   ├── tags/            # 标签总览 + [slug] 标签页
+    │   ├── admin/           # 写作台（手机发文，见 docs/手机写博客.md）
     │   ├── about.astro
     │   ├── search.astro     # 搜索页（命令面板的后备入口）
     │   ├── search.json.ts   # 构建期生成的搜索索引
     │   ├── robots.txt.ts    # 构建期生成，sitemap 地址跟随站点域名
     │   ├── rss.xml.ts
     │   └── 404.astro
+    ├── scripts/admin/       # 写作台逻辑（lib/ 下是可在 Node 里单测的纯函数）
     ├── styles/global.css    # 设计令牌 + 全部基础样式
     └── utils/               # 日期、阅读时长、分类/专栏/标签聚合、相关文章
 ```
@@ -98,6 +100,18 @@ cover: /images/xxx.jpg     # 可选，列表缩略图 + og:image
 **草稿预览**：`draft: true` 的文章在 `npm run dev` 下可直接访问并带 `draft` 标记，但不会进入生产构建的列表、RSS、sitemap 和搜索索引。
 
 **二级目录**：目前 `src/pages/blog/[id].astro` 只支持单层文件名。如果想把文章按年份分目录，把文件重命名为 `[...id].astro` 即可支持 `2026/my-post.md` → `/blog/2026/my-post/`。
+
+## 在手机上写文章（写作台）
+
+仓库自带一个给自己用的手机写作台：打开 <https://lastembryo.netlify.app/admin/>，粘贴一个 GitHub 细粒度令牌后，就能在手机上新建 / 修改 / 删除文章、上传图片。**保存 = 向 `main` 分支提交 commit**，Netlify 检测到推送后自动重新构建，约 1 分钟站点更新。
+
+- 令牌：Fine-grained PAT，仅勾选本仓库，Repository permissions → Contents 设为 **Read and write**
+- 令牌只存在手机浏览器的 localStorage，不会进仓库；万一泄露，去 GitHub 吊销即可
+- 只是页面，没有后端：浏览器直接调用 GitHub API，所以不需要额外部署或 OAuth 服务
+- 想先看看界面、不写仓库：打开 `/admin/?demo=1` 演示模式
+- 详细步骤和故障排查：**[docs/手机写博客.md](docs/手机写博客.md)**
+
+写作台是给自己用的工具页，已经 `noindex` 且从 sitemap 里排除，不会出现在站点导航里。
 
 ## 改成你自己的
 

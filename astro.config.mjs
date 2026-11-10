@@ -13,7 +13,12 @@ const site = process.env.SITE_URL || process.env.URL || 'https://example.com';
 export default defineConfig({
   site,
   trailingSlash: 'always',
-  integrations: [sitemap()],
+  // 写作台是给自己用的工具页，不让搜索引擎收录
+  integrations: [
+    sitemap({
+      filter: (page) => !page.includes('/admin'),
+    }),
+  ],
   build: {
     format: 'directory',
   },

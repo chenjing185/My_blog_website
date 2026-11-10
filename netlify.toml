@@ -24,6 +24,13 @@
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
+# 写作台：不上搜索引擎，也不缓存 HTML（避免手机上看到旧版本界面）
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
 # 订阅源与索引：短缓存
 [[headers]]
   for = "/rss.xml"
