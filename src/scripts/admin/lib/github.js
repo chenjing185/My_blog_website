@@ -55,6 +55,9 @@ function errorMessage(status, data) {
   }
   if (status === 404) return '找不到仓库、分支或文件，也可能是令牌没有该仓库的访问权限';
   if (status === 409) return '文件在别处被修改过（版本冲突），需要先同步';
+  if (status === 422 && /fast forward|stale/i.test(apiMessage)) {
+    return '分支在你提交前又被更新了，刷新后再试一次';
+  }
   if (status === 422) return `提交被 GitHub 拒绝：${apiMessage || '内容或参数不合法'}`;
   if (status >= 500) return 'GitHub 服务暂时不可用，请稍后重试';
   return `请求失败（HTTP ${status}）${apiMessage ? `：${apiMessage}` : ''}`;
@@ -113,6 +116,86 @@ export function createGitHubClient(options = {}) {
       });
     }
     return data;
+  }
+
+  // 注意：读 ref 用 git/ref/（单数），写 ref 用 git/refs/（复数），这是 GitHub 的历史包袱
+  const refReadPath = `${repoPath}/git/ref/heads/${encodePath(branch)}`;
+  const refWritePath = `${repoPath}/git/refs/heads/${encodePath(branch)}`;
+
+  async function getRef() {
+    const data = await request(refReadPath);
+    return { sha: data?.object?.sha ?? '' };
+  }
+
+  async function getCommit(sha) {
+    const data = await request(`${repoPath}/git/commits/${encodeURIComponent(sha)}`);
+    return { sha: data.sha, message: data.message ?? '', treeSha: data?.tree?.sha ?? '' };
+  }
+
+  async function createCommit({ message, tree, parents }) {
+    const data = await request(`${repoPath}/git/commits`, {
+      method: 'POST',
+      body: { message, tree, parents },
+    });
+    return { sha: data.sha, commitUrl: `https://github.com/${owner}/${repo}/commit/${data.sha}` };
+  }
+
+  /**
+   * 一个 commit 里完成多个文件的新增 / 修改 / 删除。
+   * 重命名 = 新路径写入 + 旧路径删除，同一个 commit 落地，
+   * 不会出现「写成功了但旧文件没删掉、站点上出现两篇同名文章」的中间态。
+   *
+   * changes: [{ path, text }] | [{ path, base64 }] | [{ path, delete: true }]
+   */
+  async function commitFiles(changes, { message } = {}) {
+    const list = (Array.isArray(changes) ? changes : []).filter((item) => item && item.path && typeof item.path === 'string');
+    if (list.length === 0) throw new GitHubError('没有要提交的改动', { status: 400 });
+
+    const { sha: parentSha } = await getRef();
+    if (!parentSha) throw new GitHubError('读不到分支的最新提交，稍后重试', { status: 404 });
+    const parent = await getCommit(parentSha);
+
+    const entries = [];
+    for (const change of list) {
+      if (change.delete) {
+        entries.push({ path: change.path, mode: '100644', type: 'blob', sha: null });
+        continue;
+      }
+      if (change.base64 !== undefined) {
+        const blob = await request(`${repoPath}/git/blobs`, {
+          method: 'POST',
+          body: { content: String(change.base64).replace(/^data:[^;]+;base64,/, ''), encoding: 'base64' },
+        });
+        entries.push({ path: change.path, mode: '100644', type: 'blob', sha: blob.sha });
+        continue;
+      }
+      entries.push({ path: change.path, mode: '100644', type: 'blob', content: String(change.text ?? '') });
+    }
+
+    const tree = await request(`${repoPath}/git/trees`, {
+      method: 'POST',
+      body: { base_tree: parent.treeSha, tree: entries },
+    });
+    const commit = await createCommit({ message: message || 'post: 更新文件', tree: tree.sha, parents: [parentSha] });
+    await request(refWritePath, { method: 'PATCH', body: { sha: commit.sha, force: false } });
+
+    return { commitSha: commit.sha, commitUrl: commit.commitUrl, files: list.length };
+  }
+
+  /** 递归列目录下的文件（图片库用）；路径里带时间戳，倒序 ≈ 新上传的在前 */
+  async function listTree(dir) {
+    const data = await request(`${repoPath}/git/trees/${encodePath(branch)}?recursive=1`);
+    const tree = Array.isArray(data && data.tree) ? data.tree : [];
+    const prefix = `${String(dir ?? '').replace(/\/+$/, '')}/`;
+    return tree
+      .filter((item) => item && item.type === 'blob' && String(item.path).startsWith(prefix))
+      .map((item) => ({
+        path: item.path,
+        name: String(item.path).slice(prefix.length),
+        size: item.size ?? 0,
+        sha: item.sha,
+      }))
+      .sort((a, b) => String(b.path).localeCompare(String(a.path)));
   }
 
   return {
@@ -200,5 +283,14 @@ export function createGitHubClient(options = {}) {
         commitUrl: data?.commit?.html_url ?? null,
       };
     },
+
+    /** 分支最新提交 */
+    getRef,
+    /** 提交详情（含 root tree） */
+    getCommit,
+    /** 多文件原子提交：新增 / 修改 / 删除合在一个 commit 里 */
+    commitFiles,
+    /** 递归列目录（图片库） */
+    listTree,
   };
 }

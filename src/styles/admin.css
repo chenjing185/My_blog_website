@@ -193,6 +193,11 @@ code {
   background: var(--surface-2);
 }
 
+a.icon-btn {
+  text-decoration: none;
+  color: var(--text-muted);
+}
+
 /* ---------- 布局 ---------- */
 .app {
   max-width: 760px;
@@ -910,6 +915,164 @@ input[type='date'] {
   gap: 8px;
   margin-top: 18px;
   flex-wrap: wrap;
+}
+
+/* ---------- 本机草稿提示 ---------- */
+.draft-hint {
+  margin-top: 12px;
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.draft-hint-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.draft-hint-head .card-title {
+  margin: 0;
+}
+
+.draft-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.draft-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.draft-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.draft-info strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draft-info span {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.draft-item .row-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.draft-item .btn {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+/* ---------- 图片库 ---------- */
+.library {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.library-card {
+  width: 100%;
+  max-width: 720px;
+  max-height: 86dvh;
+  overflow: auto;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.library-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.library-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.image-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.image-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.image-item-body {
+  padding: 8px;
+}
+
+.image-name {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
+.image-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.image-btns .btn {
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
 }
 
 /* ---------- 桌面端 ---------- */

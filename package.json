@@ -10,7 +10,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "test": "node --test scripts/test-admin-lib.mjs scripts/test-admin-e2e.mjs",
+    "test": "node --test scripts/test-admin-lib.mjs scripts/test-admin-e2e.mjs scripts/test-admin-extras.mjs",
     "astro": "astro"
   },
   "dependencies": {

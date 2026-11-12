@@ -96,6 +96,65 @@ export function createMockClient(options = {}) {
       return { sha: nextSha, commitSha: nextSha, commitUrl: '' };
     },
 
+    async getRef() {
+      return { sha: simpleHash(`ref:${store.size}`) };
+    },
+
+    async getCommit(sha) {
+      return { sha, message: '', treeSha: 'mock-tree' };
+    },
+
+    /** 多文件原子提交：演示模式里同样「要么全成，要么全不动」 */
+    async commitFiles(changes, { message } = {}) {
+      const list = (Array.isArray(changes) ? changes : []).filter((item) => item && item.path);
+      if (list.length === 0) throw new GitHubError('没有要提交的改动', { status: 400 });
+
+      for (const change of list) {
+        if (change.delete && !store.has(change.path)) {
+          throw new GitHubError('找不到要删除的文件', { status: 404 });
+        }
+      }
+
+      for (const change of list) {
+        const nextSha = simpleHash(`${change.path}:${message || ''}:${Date.now()}:${Math.random()}`);
+        if (change.delete) {
+          store.delete(change.path);
+          continue;
+        }
+        if (change.base64 !== undefined) {
+          store.set(change.path, { base64: String(change.base64).replace(/^data:[^;]+;base64,/, ''), sha: nextSha });
+          continue;
+        }
+        store.set(change.path, { text: String(change.text ?? ''), sha: nextSha });
+      }
+
+      const commitSha = simpleHash(`commit:${list.map((change) => change.path).join(',')}:${Date.now()}`);
+      return {
+        commitSha,
+        commitUrl: `https://github.com/${owner}/${repo}/commit/${commitSha}`,
+        files: list.length,
+        message,
+      };
+    },
+
+    /** 递归列目录，供图片库使用 */
+    async listTree(dir = '') {
+      const prefix = dir ? `${String(dir).replace(/\/+$/, '')}/` : '';
+      return [...store.keys()]
+        .filter((path) => path.startsWith(prefix))
+        .map((path) => {
+          const file = store.get(path);
+          const text = file.text ?? '';
+          return {
+            path,
+            name: path.slice(prefix.length),
+            size: file.base64 ? Math.round((file.base64.length * 3) / 4) : new TextEncoder().encode(text).length,
+            sha: file.sha,
+          };
+        })
+        .sort((a, b) => String(b.path).localeCompare(String(a.path)));
+    },
+
     /** 测试用：直接读内存里的文件 */
     _peek(path) {
       return store.get(path) ?? null;

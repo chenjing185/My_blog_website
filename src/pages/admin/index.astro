@@ -42,6 +42,7 @@ import '../../styles/admin.css';
         </a>
         <div class="topbar-actions">
           <span id="conn-dot" class="dot" title="未连接" aria-label="连接状态"></span>
+          <a class="icon-btn" href="/" target="_blank" rel="noopener noreferrer" aria-label="打开站点首页" title="打开站点">↗</a>
           <button id="btn-theme" class="icon-btn" type="button" aria-label="切换白天/夜间" title="切换白天/夜间">◐</button>
           <button id="btn-settings" class="icon-btn" type="button" aria-label="设置" title="设置">⚙</button>
         </div>
@@ -103,6 +104,29 @@ import '../../styles/admin.css';
             </p>
           </details>
 
+          <details class="hint advanced">
+            <summary>高级选项（换成别的仓库 / 分支）</summary>
+            <div class="grid-2">
+              <label class="field">
+                <span>仓库所有者</span>
+                <input id="setup-owner" type="text" placeholder="chenjing185" autocomplete="off" autocapitalize="off" spellcheck="false" />
+              </label>
+              <label class="field">
+                <span>仓库名</span>
+                <input id="setup-repo" type="text" placeholder="My_blog_website" autocomplete="off" autocapitalize="off" spellcheck="false" />
+              </label>
+              <label class="field">
+                <span>分支</span>
+                <input id="setup-branch" type="text" placeholder="main" autocomplete="off" autocapitalize="off" spellcheck="false" />
+              </label>
+              <label class="field">
+                <span>文章目录</span>
+                <input id="setup-dir" type="text" placeholder="src/content/blog" autocomplete="off" autocapitalize="off" spellcheck="false" />
+              </label>
+            </div>
+            <p class="muted small">留空就用本站默认值，也就是下面这行：<code>chenjing185/My_blog_website</code> · <code>main</code> · <code>src/content/blog</code>。</p>
+          </details>
+
           <p id="setup-error" class="error" hidden></p>
           <button id="setup-submit" class="btn primary block" type="submit">连接并开始</button>
         </form>
@@ -119,6 +143,15 @@ import '../../styles/admin.css';
           <button id="btn-new" class="btn primary" type="button">新建</button>
         </div>
         <p id="list-meta" class="muted small"></p>
+
+        <div id="draft-hint" class="card draft-hint" hidden>
+          <div class="draft-hint-head">
+            <h2 class="card-title">本机有未保存的草稿</h2>
+            <button id="btn-clear-drafts" class="btn small ghost" type="button">全部丢弃</button>
+          </div>
+          <ul id="draft-list" class="draft-list"></ul>
+        </div>
+
         <ul id="post-list" class="post-list"></ul>
         <p id="list-empty" class="empty" hidden>还没有文章，点右上角「新建」开始写吧。</p>
         <p id="list-error" class="error" hidden></p>
@@ -158,15 +191,15 @@ import '../../styles/admin.css';
             <div class="more-body">
               <label class="field">
                 <span>分类</span>
-                <input id="f-category" type="text" placeholder="随笔" />
+                <input id="f-category" type="text" list="dl-category" placeholder="随笔" />
               </label>
               <label class="field">
                 <span>标签（逗号分隔）</span>
-                <input id="f-tags" type="text" placeholder="随笔, Astro" />
+                <input id="f-tags" type="text" list="dl-tags" placeholder="随笔, Astro" />
               </label>
               <label class="field">
                 <span>专栏</span>
-                <input id="f-series" type="text" placeholder="建站笔记" />
+                <input id="f-series" type="text" list="dl-series" placeholder="建站笔记" />
               </label>
               <label class="field">
                 <span>文件名（决定网址，别轻易改）</span>
@@ -223,6 +256,7 @@ import '../../styles/admin.css';
           <div class="meta-row">
             <span id="word-count" class="muted small">0 字</span>
             <div class="more-actions">
+              <button id="btn-library" class="btn small" type="button">图片库</button>
               <button id="btn-view-file" class="btn small" type="button" hidden>查看 GitHub 文件</button>
               <button id="btn-delete" class="btn small danger" type="button" hidden>删除文章</button>
             </div>
@@ -257,6 +291,10 @@ import '../../styles/admin.css';
             <span>访问令牌</span>
             <input id="s-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" />
           </label>
+          <label class="field">
+            <span>Netlify 站点名（可选，用来看部署记录）</span>
+            <input id="s-netlify" type="text" placeholder="lastembryo" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          </label>
           <div class="row">
             <button id="btn-test" class="btn" type="button">测试连接</button>
             <button id="btn-save-settings" class="btn primary" type="button">保存</button>
@@ -274,6 +312,9 @@ import '../../styles/admin.css';
           <p class="muted small">
             文章文件：<code>src/content/blog/&lt;文件名&gt;.md</code>；图片：<code>public/uploads/年-月/</code>。
           </p>
+          <p id="deploy-row" class="muted small" hidden>
+            部署状态：<a id="deploy-link" class="link" href="#" target="_blank" rel="noopener noreferrer">打开 Netlify 部署记录</a>
+          </p>
           <p class="muted small">
             完整步骤见仓库里的 <code>docs/手机写博客.md</code>，或打开
             <a class="link" href="https://github.com/chenjing185/My_blog_website" target="_blank" rel="noopener noreferrer">GitHub 仓库</a>。
@@ -289,6 +330,29 @@ import '../../styles/admin.css';
         <p class="muted small"><a class="link" href="/">← 回到站点首页</a></p>
       </section>
     </main>
+
+    <div id="library" class="library" hidden>
+      <div class="library-card" role="dialog" aria-modal="true" aria-labelledby="library-title">
+        <div class="library-head">
+          <h2 id="library-title">图片库</h2>
+          <div class="library-actions">
+            <button id="btn-library-upload" class="btn small" type="button">上传新图</button>
+            <button id="btn-library-close" class="icon-btn" type="button" aria-label="关闭">✕</button>
+          </div>
+        </div>
+        <p id="library-status" class="muted small"></p>
+        <div id="library-grid" class="image-grid"></div>
+        <p id="library-empty" class="empty" hidden>
+          还没有上传过图片。写文章时点工具条上的「图片」上传的第一张，就会出现在这里。
+        </p>
+        <p id="library-error" class="error" hidden></p>
+        <input id="library-file" type="file" accept="image/*" multiple hidden />
+      </div>
+    </div>
+
+    <datalist id="dl-tags"></datalist>
+    <datalist id="dl-category"></datalist>
+    <datalist id="dl-series"></datalist>
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 

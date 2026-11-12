@@ -3,11 +3,13 @@
  *
  * 结构：
  *   1. 常量 / 状态 / 小工具
- *   2. 视图切换与路由（#/、#/new、#/edit/<slug>、#/settings）
- *   3. GitHub 连接与设置
- *   4. 文章列表
- *   5. 编辑器（保存、删除、图片、预览、自动草稿）
- *   6. 事件绑定与启动
+ *   2. 本地存储（草稿多槽位、列表缓存）
+ *   3. 视图切换与路由（#/、#/new、#/edit/<slug>、#/settings）
+ *   4. GitHub 连接与设置
+ *   5. 文章列表（带 sha 缓存、标签补全、草稿提示）
+ *   6. 编辑器（保存、重命名、删除、图片、预览、自动草稿）
+ *   7. 图片库
+ *   8. 事件绑定与启动
  */
 
 import { createGitHubClient, GitHubError } from './lib/github.js';
@@ -16,6 +18,16 @@ import { parsePost, serializePost, validateFrontmatter, countWords } from './lib
 import { renderMarkdown } from './lib/markdown.js';
 import { defaultSlug, isValidSlug, safeAssetName } from './lib/slug.js';
 import { compressImage } from './lib/image.js';
+import {
+  NEW_DRAFT_KEY,
+  draftKeyForSlug,
+  listDrafts,
+  pickDraft,
+  putDraft,
+  readDrafts,
+  removeDraft,
+  snapshotFromSource,
+} from './lib/drafts.js';
 
 const DEFAULT_CONFIG = {
   token: '',
@@ -23,19 +35,27 @@ const DEFAULT_CONFIG = {
   repo: 'My_blog_website',
   branch: 'main',
   dir: 'src/content/blog',
+  netlifySite: '',
 };
 
 const UPLOADS_DIR = 'public/uploads';
+const IMAGE_RE = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
+
+/** 令牌保存多久后提醒换新（细粒度 PAT 常见有效期 90 天） */
+const TOKEN_WARN_DAYS = 80;
 
 const KEYS = {
   config: 'czw.admin.config.v1',
   theme: 'czw.admin.theme',
-  autosave: 'czw.admin.autosave.v1',
+  drafts: 'czw.admin.drafts.v1',
+  cache: 'czw.admin.listcache.v1',
+  tokenWarned: 'czw.admin.tokenwarned.v1',
 };
 
 const state = {
   view: 'boot',
   demo: false,
+  offline: false,
   config: { ...DEFAULT_CONFIG },
   client: null,
   user: null,
@@ -47,6 +67,9 @@ const state = {
   dirty: false,
   autosaveTimer: null,
   previewing: false,
+  drafts: {},
+  images: [],
+  imagesLoaded: false,
 };
 
 /* ------------------------------------------------------------------ *
@@ -67,7 +90,7 @@ function writeJson(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* 隐私模式可能写不进去，忽略 */
+    /* 隐私模式 / 配额满了都可能写不进去，忽略 */
   }
 }
 
@@ -128,6 +151,10 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function errorText(error, fallback) {
+  return (error && error.message) || fallback;
+}
+
 async function mapLimit(items, limit, worker) {
   const results = new Array(items.length);
   let cursor = 0;
@@ -148,8 +175,38 @@ function syncHeaderOffset() {
   document.documentElement.style.setProperty('--header-offset', `${height}px`);
 }
 
+/** 仓库里的路径 → 站点上的 URL（public/ 是目录名，不是网址前缀） */
+function publicUrl(repoPath) {
+  return `/${String(repoPath).replace(/^public\//, '')}`;
+}
+
 /* ------------------------------------------------------------------ *
- * 2. 视图 / 路由
+ * 2. 本地存储
+ * ------------------------------------------------------------------ */
+
+function readDraftsStore() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(KEYS.drafts);
+  } catch {
+    raw = null;
+  }
+  return readDrafts(raw);
+}
+
+function writeDraftsStore(drafts) {
+  state.drafts = drafts;
+  writeJson(KEYS.drafts, drafts);
+  if (state.view === 'list') renderDraftHint();
+}
+
+function readListCache() {
+  const cache = readJson(KEYS.cache);
+  return cache && typeof cache === 'object' && !Array.isArray(cache) ? cache : {};
+}
+
+/* ------------------------------------------------------------------ *
+ * 3. 视图 / 路由
  * ------------------------------------------------------------------ */
 
 const VIEWS = {
@@ -267,17 +324,25 @@ async function route() {
     }
     await showList({ force: true });
   } catch (error) {
-    toast(error && error.message ? error.message : '页面加载失败', { type: 'error' });
+    toast(errorText(error, '页面加载失败'), { type: 'error' });
     setView('list');
   }
 }
 
 /* ------------------------------------------------------------------ *
- * 3. 连接与设置
+ * 4. 连接与设置
  * ------------------------------------------------------------------ */
 
+/**
+ * 保存配置；令牌没变就沿用原来的保存时间，用来判断「这把钥匙是不是该换了」。
+ */
 function persistConfig(config) {
-  writeJson(KEYS.config, config);
+  const previous = readJson(KEYS.config) || {};
+  const keptAt = previous.token && previous.token === config.token ? Number(previous.savedAt || 0) : 0;
+  const next = { ...config, savedAt: keptAt || Date.now() };
+  state.config = next;
+  writeJson(KEYS.config, next);
+  return next;
 }
 
 async function connect(config) {
@@ -287,14 +352,31 @@ async function connect(config) {
   state.config = { ...config };
   state.user = user;
   state.repo = repo;
+  state.imagesLoaded = false;
   setConnected(true, `${user.login} · ${repo.fullName}`);
   return { user, repo };
 }
 
+function readSetupForm() {
+  const pick = (id, fallback) => {
+    const element = $(id);
+    const value = element ? element.value.trim() : '';
+    return value || fallback;
+  };
+  return {
+    token: $('setup-token').value.trim(),
+    owner: pick('setup-owner', DEFAULT_CONFIG.owner),
+    repo: pick('setup-repo', DEFAULT_CONFIG.repo),
+    branch: pick('setup-branch', DEFAULT_CONFIG.branch),
+    dir: pick('setup-dir', DEFAULT_CONFIG.dir),
+    netlifySite: state.config.netlifySite || '',
+  };
+}
+
 async function handleSetupSubmit(event) {
   event.preventDefault();
-  const token = $('setup-token').value.trim();
-  if (!token) {
+  const config = readSetupForm();
+  if (!config.token) {
     showError('setup-error', '先粘贴访问令牌再点连接');
     return;
   }
@@ -303,12 +385,12 @@ async function handleSetupSubmit(event) {
   submit.textContent = '连接中…';
   clearError('setup-error');
   try {
-    const config = { ...DEFAULT_CONFIG, token };
     await connect(config);
     persistConfig(config);
+    checkTokenAge();
     await goHome();
   } catch (error) {
-    showError('setup-error', error && error.message ? error.message : '连接失败');
+    showError('setup-error', errorText(error, '连接失败'));
     setConnected(false, '连接失败');
   } finally {
     submit.disabled = false;
@@ -324,6 +406,34 @@ async function goHome() {
   }
 }
 
+function deployUrl() {
+  const site = String(state.config.netlifySite || '').trim();
+  if (!site) return '';
+  return `https://app.netlify.com/sites/${encodeURIComponent(site)}/deploys`;
+}
+
+function renderDeployLink() {
+  const url = deployUrl();
+  const row = $('deploy-row');
+  if (!row) return;
+  row.hidden = !url;
+  if (url) $('deploy-link').href = url;
+}
+
+function checkTokenAge() {
+  const savedAt = Number(state.config.savedAt || 0);
+  if (!savedAt) return;
+  const days = Math.floor((Date.now() - savedAt) / 86400000);
+  if (days < TOKEN_WARN_DAYS) return;
+  // 一周最多提醒一次，别每次打开都弹
+  const lastWarned = Number(readJson(KEYS.tokenWarned) || 0);
+  if (Date.now() - lastWarned < 7 * 86400000) return;
+  writeJson(KEYS.tokenWarned, Date.now());
+  toast(`令牌是 ${days} 天前保存的。细粒度令牌大多 90 天到期，建议提前去 GitHub 重新生成一个`, {
+    type: 'error',
+  });
+}
+
 function renderSettings() {
   setView('settings');
   const config = state.config;
@@ -332,7 +442,9 @@ function renderSettings() {
   $('s-branch').value = config.branch;
   $('s-dir').value = config.dir;
   $('s-token').value = config.token;
+  $('s-netlify').value = config.netlifySite || '';
   $('settings-status').textContent = state.repo ? `当前连接：${state.repo.fullName} · ${config.dir}` : '';
+  renderDeployLink();
   clearError('settings-error');
 }
 
@@ -343,6 +455,7 @@ function readSettingsForm() {
     repo: $('s-repo').value.trim(),
     branch: $('s-branch').value.trim() || 'main',
     dir: $('s-dir').value.trim() || DEFAULT_CONFIG.dir,
+    netlifySite: $('s-netlify').value.trim(),
   };
 }
 
@@ -361,7 +474,7 @@ async function testSettings() {
     const [user, repo, files] = await Promise.all([client.getUser(), client.getRepo(), client.listFiles(config.dir)]);
     $('settings-status').textContent = `连接正常：${user.login} · ${repo.fullName} · 分支 ${config.branch} · 目录下 ${files.length} 篇文章`;
   } catch (error) {
-    showError('settings-error', error && error.message ? error.message : '连接失败');
+    showError('settings-error', errorText(error, '连接失败'));
     $('settings-status').textContent = '';
   } finally {
     button.disabled = false;
@@ -383,7 +496,7 @@ async function saveSettings() {
     toast('设置已保存');
     location.hash = '#/';
   } catch (error) {
-    showError('settings-error', error && error.message ? error.message : '保存失败');
+    showError('settings-error', errorText(error, '保存失败'));
   } finally {
     button.disabled = false;
   }
@@ -392,7 +505,7 @@ async function saveSettings() {
 async function disconnect() {
   const confirmed = await showModal({
     title: '断开连接？',
-    text: '只会清掉这台设备上保存的令牌，仓库里的文章不受影响。',
+    text: '只会清掉这台设备上保存的令牌，仓库里的文章和本机草稿都不受影响。',
     actions: [
       { label: '取消', value: false },
       { label: '断开', value: true, kind: 'danger' },
@@ -404,6 +517,8 @@ async function disconnect() {
   state.user = null;
   state.repo = null;
   state.posts = [];
+  state.images = [];
+  state.imagesLoaded = false;
   state.config = { ...DEFAULT_CONFIG };
   setConnected(false, '未连接');
   $('setup-token').value = '';
@@ -412,7 +527,7 @@ async function disconnect() {
 }
 
 /* ------------------------------------------------------------------ *
- * 4. 列表
+ * 5. 列表
  * ------------------------------------------------------------------ */
 
 function sortPosts(posts) {
@@ -429,32 +544,164 @@ async function showList(options = {}) {
   setView('list');
   if (force || state.posts.length === 0) await loadPosts();
   renderPosts();
+  renderDraftHint();
 }
 
+/**
+ * 读文章列表。
+ * 1) 先用 sha 对比本地缓存：文件没变就不重新拉正文，手机上刷新快很多；
+ * 2) 只有变化的文件才 getFile（并发 8）；
+ * 3) 正文不进缓存，打开编辑器时单独取最新版本，顺便避免用过期的 sha 覆盖别人。
+ */
 async function loadPosts() {
   clearError('list-error');
   $('list-meta').textContent = '正在读取仓库…';
   $('post-list').replaceChildren();
   try {
     const files = await state.client.listFiles(state.config.dir);
-    const posts = await mapLimit(files, 6, async (file) => {
+    const cache = readListCache();
+    const nextCache = {};
+
+    const posts = await mapLimit(files, 8, async (file) => {
+      const hit = cache[file.path];
+      if (hit && hit.sha === file.sha && hit.frontmatter) {
+        nextCache[file.path] = hit;
+        return { file, sha: file.sha, frontmatter: hit.frontmatter, extras: hit.extras || [], body: '', cached: true };
+      }
       try {
         const data = await state.client.getFile(file.path);
         const parsed = parsePost(data.text);
+        nextCache[file.path] = { sha: data.sha, frontmatter: parsed.frontmatter, extras: parsed.extras };
         return { file, sha: data.sha, frontmatter: parsed.frontmatter, extras: parsed.extras, body: parsed.body };
       } catch (error) {
         return { file, sha: file.sha, frontmatter: {}, extras: [], body: '', error };
       }
     });
+
     state.posts = posts;
     state.loadedAt = Date.now();
+    writeJson(KEYS.cache, nextCache);
     const failed = posts.filter((post) => post.error).length;
     $('list-meta').textContent = `共 ${posts.length} 篇${failed ? ' · ' + failed + ' 篇读取失败' : ''} · ${formatDateTime(state.loadedAt)} 更新`;
   } catch (error) {
     state.posts = [];
-    showError('list-error', error && error.message ? error.message : '读取文章列表失败');
+    showError('list-error', errorText(error, '读取文章列表失败'));
     $('list-meta').textContent = '';
   }
+  renderSuggestions();
+}
+
+function fillDatalist(id, values) {
+  const list = $(id);
+  if (!list) return;
+  list.replaceChildren();
+  for (const value of values) {
+    const option = document.createElement('option');
+    option.value = value;
+    list.append(option);
+  }
+}
+
+/** 把已有的分类 / 标签 / 专栏汇总成输入提示，避免手打出一堆同义标签 */
+function renderSuggestions() {
+  const tags = new Set();
+  const categories = new Set();
+  const series = new Set();
+  for (const post of state.posts) {
+    const fm = post.frontmatter || {};
+    if (fm.category) categories.add(String(fm.category));
+    if (fm.series) series.add(String(fm.series));
+    for (const tag of Array.isArray(fm.tags) ? fm.tags : []) {
+      if (tag) tags.add(String(tag));
+    }
+  }
+  fillDatalist('dl-tags', [...tags].sort((a, b) => a.localeCompare(b, 'zh-Hans-CN')));
+  fillDatalist('dl-category', [...categories].sort((a, b) => a.localeCompare(b, 'zh-Hans-CN')));
+  fillDatalist('dl-series', [...series].sort((a, b) => a.localeCompare(b, 'zh-Hans-CN')));
+}
+
+function renderDraftHint() {
+  const wrap = $('draft-hint');
+  const list = $('draft-list');
+  if (!wrap || !list) return;
+
+  const drafts = listDrafts(state.drafts || readDraftsStore());
+  list.replaceChildren();
+  wrap.hidden = drafts.length === 0;
+  if (drafts.length === 0) return;
+
+  for (const draft of drafts) {
+    const item = document.createElement('li');
+    item.className = 'draft-item';
+
+    const info = document.createElement('div');
+    info.className = 'draft-info';
+    const title = document.createElement('strong');
+    title.textContent = draft.title;
+    const meta = document.createElement('span');
+    const kind = draft.remoteBackup ? '保存时留下的远端版本' : draft.isNew ? '新文章' : '修改';
+    meta.textContent = `${kind} · ${draft.chars} 字 · ${formatDateTime(draft.savedAt)}`;
+    info.append(title, meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'row-actions';
+
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'btn small';
+    open.textContent = '继续写';
+    open.addEventListener('click', () => openDraft(draft));
+
+    const drop = document.createElement('button');
+    drop.type = 'button';
+    drop.className = 'btn small ghost';
+    drop.textContent = '丢弃';
+    drop.addEventListener('click', () => dropDraft(draft));
+
+    actions.append(open, drop);
+    item.append(info, actions);
+    list.append(item);
+  }
+}
+
+function openDraft(draft) {
+  if (draft.key === NEW_DRAFT_KEY) {
+    location.hash = '#/new';
+    return;
+  }
+  location.hash = `#/edit/${encodeURIComponent(draft.key)}`;
+}
+
+async function dropDraft(draft) {
+  const confirmed = await showModal({
+    title: '丢弃这份草稿？',
+    text: `「${draft.title}」在本机保存的 ${draft.chars} 字将被删除，仓库里的文章不受影响。`,
+    actions: [
+      { label: '取消', value: false },
+      { label: '丢弃', value: true, kind: 'danger' },
+    ],
+  });
+  if (!confirmed) return;
+  writeDraftsStore(removeDraft(readDraftsStore(), draft.key));
+  renderDraftHint();
+  toast('草稿已丢弃');
+}
+
+async function clearAllDrafts() {
+  const drafts = listDrafts(readDraftsStore());
+  if (drafts.length === 0) return;
+  const confirmed = await showModal({
+    title: '丢弃全部本机草稿？',
+    text: `共 ${drafts.length} 份未保存的草稿会被删除，仓库里的文章不受影响。`,
+    actions: [
+      { label: '取消', value: false },
+      { label: '全部丢弃', value: true, kind: 'danger' },
+    ],
+  });
+  if (!confirmed) return;
+  writeDraftsStore({});
+  renderDraftHint();
+  toast('本机草稿已清空');
 }
 
 function renderPosts() {
@@ -539,7 +786,7 @@ function renderPosts() {
 }
 
 /* ------------------------------------------------------------------ *
- * 5. 编辑器
+ * 6. 编辑器
  * ------------------------------------------------------------------ */
 
 function updateEditorChrome() {
@@ -621,10 +868,45 @@ async function openEditor(slug) {
     post = state.posts.find((item) => baseName(item.file.name) === slug);
   }
   if (!post) {
+    // 仓库里没有这篇，但本机可能还留着它的草稿（比如被别人删了）
+    const snapshot = pickDraft(readDraftsStore(), draftKeyForSlug(slug));
+    if (snapshot) {
+      fillForm({ isNew: true });
+      state.current.slug = slug;
+      applySnapshot(snapshot);
+      $('f-slug').value = snapshot.slug || slug;
+      toast('仓库里没有这篇文章了，已按本机草稿打开；保存会重新创建它');
+      return;
+    }
     toast('找不到这篇文章，可能已经被删除了', { type: 'error' });
     location.hash = '#/';
     return;
   }
+
+  // 重新拉一次正文：拿到最新 sha，既不会用过期版本覆盖别人，也能看到别处的修改
+  try {
+    $('editor-status').textContent = '读取中…';
+    const fresh = await state.client.getFile(post.file.path);
+    const parsed = parsePost(fresh.text);
+    post = {
+      file: { ...post.file, sha: fresh.sha, size: fresh.size },
+      sha: fresh.sha,
+      frontmatter: parsed.frontmatter,
+      extras: parsed.extras,
+      body: parsed.body,
+    };
+  } catch (error) {
+    // 拿不到正文时千万别让人接着编辑：空正文一保存就把原文覆盖了
+    if (!post.body) {
+      toast(`读取正文失败：${errorText(error, '网络或权限问题')}。先不打开编辑器，避免把原文覆盖成空白`, {
+        type: 'error',
+      });
+      location.hash = '#/';
+      return;
+    }
+    toast(`读取最新正文失败，先用手上的版本：${errorText(error, '')}`, { type: 'error' });
+  }
+
   fillForm({ isNew: false, post });
   restoreAutosaveIfAny();
 }
@@ -736,16 +1018,8 @@ async function savePost(event) {
       const result = await state.client.putFile(path, source, { message });
       await afterSave(result, { title: frontmatter.title });
     } else if (renamed) {
-      const result = await state.client.putFile(path, source, { message });
-      try {
-        await state.client.deleteFile(current.file.path, {
-          message: `post: 重命名《${frontmatter.title}》`,
-          sha: current.file.sha,
-        });
-      } catch (deleteError) {
-        toast(`新文件已保存，但旧文件没删掉：${(deleteError && deleteError.message) || ''}`, { type: 'error' });
-      }
-      await afterSave(result, { title: frontmatter.title });
+      const result = await renamePost({ source, path, title: frontmatter.title });
+      if (result) await afterSave(result, { title: frontmatter.title });
     } else {
       const result = await state.client.putFile(path, source, { message, sha: current.file.sha });
       await afterSave(result, { title: frontmatter.title });
@@ -753,20 +1027,72 @@ async function savePost(event) {
   } catch (error) {
     if (error instanceof GitHubError && error.status === 409) {
       await handleConflict({ path, source, message });
+    } else if (error instanceof GitHubError && error.status === 0) {
+      // 断网：先把内容落到本机草稿，别让手机上写的一段话白费
+      if (persistAutosave()) {
+        toast('网络不通，内容已存成本机草稿；联网后打开这篇点「恢复」就能接着提交', { type: 'error' });
+      } else {
+        toast(errorText(error, '网络不通，保存失败'), { type: 'error' });
+      }
+      showError('save-error', errorText(error, '保存失败'));
     } else {
-      showError('save-error', (error && error.message) || '保存失败');
-      toast((error && error.message) || '保存失败', { type: 'error' });
+      showError('save-error', errorText(error, '保存失败'));
+      toast(errorText(error, '保存失败'), { type: 'error' });
     }
   } finally {
     setSaving(false);
   }
 }
 
+/**
+ * 重命名：新路径写入 + 旧路径删除放在同一个 commit 里，
+ * 失败不会留下「两个文件都在」的残骸。
+ */
+async function renamePost(options) {
+  const { source, path, title } = options;
+  const current = state.current;
+
+  let latest = null;
+  try {
+    latest = await state.client.getFile(current.file.path);
+  } catch {
+    latest = null;
+  }
+  if (latest && latest.sha !== current.file.sha) {
+    const confirmed = await showModal({
+      title: '文件在别处被修改过',
+      text: '重命名会删掉仓库里的旧文件，那边的修改会一起消失。继续吗？',
+      actions: [
+        { label: '取消', value: false },
+        { label: '仍然重命名', value: true, kind: 'danger' },
+      ],
+    });
+    if (!confirmed) {
+      showError('save-error', '没有重命名：文件已有更新版本，建议返回刷新后再改');
+      return null;
+    }
+  }
+
+  const result = await state.client.commitFiles(
+    [
+      { path, text: source },
+      { path: current.file.path, delete: true },
+    ],
+    { message: `post: 重命名《${title}》` }
+  );
+  state.posts = state.posts.map((post) =>
+    post.file.path === current.file.path
+      ? { ...post, file: { ...post.file, path, name: String(path).split('/').pop() } }
+      : post
+  );
+  return result;
+}
+
 async function handleConflict(options) {
   const { path, source, message } = options;
   const choice = await showModal({
     title: '文件在别处被修改过',
-    text: '这个文件已经被另一台设备或网页改过。要用你屏幕上的版本覆盖吗？',
+    text: '这个文件已经被另一台设备或网页改过。要用你屏幕上的版本覆盖吗？覆盖前会把远端版本留一份在本机草稿里。',
     actions: [
       { label: '取消', value: null },
       { label: '用我的版本覆盖', value: 'overwrite', kind: 'primary' },
@@ -779,9 +1105,20 @@ async function handleConflict(options) {
   try {
     const latest = await state.client.getFile(path);
     const result = await state.client.putFile(path, source, { message, sha: latest.sha });
-    await afterSave(result, { title: collectFrontmatter().title });
+    const title = collectFrontmatter().title;
+    const key = draftKeyForSlug(state.current && state.current.slug ? state.current.slug : baseName(path));
+    await afterSave(result, { title });
+    // afterSave 会清掉当前槽位，所以备份要写在后面
+    const snapshot = snapshotFromSource(key, latest.text, {
+      title: `（远端版本）${title}`,
+      remoteBackup: true,
+    });
+    writeDraftsStore(putDraft(readDraftsStore(), key, snapshot));
+    toast('已用你的版本覆盖；远端旧版本留在了本机草稿里，列表页可以看到', {
+      link: result && result.commitUrl ? { url: result.commitUrl, label: '查看提交' } : undefined,
+    });
   } catch (error) {
-    showError('save-error', (error && error.message) || '覆盖失败');
+    showError('save-error', errorText(error, '覆盖失败'));
   }
 }
 
@@ -790,7 +1127,7 @@ async function deleteCurrentPost() {
   const title = $('f-title').value.trim() || baseName(state.current.file.name);
   const confirmed = await showModal({
     title: '删除这篇文章？',
-    text: `将删除 ${state.current.file.path}。Git 历史里还能找回，但站点上会立刻消失（重新构建后）。`,
+    text: `将删除 ${state.current.file.path}。Git 历史里还能找回，但站点上会立刻消失（重新构建后）。本机草稿会一起清掉。`,
     actions: [
       { label: '取消', value: false },
       { label: '删除', value: true, kind: 'danger' },
@@ -810,7 +1147,7 @@ async function deleteCurrentPost() {
     toast(`已删除《${title}》，Netlify 大约 1 分钟后更新站点`, { link });
     location.hash = '#/';
   } catch (error) {
-    showError('save-error', (error && error.message) || '删除失败');
+    showError('save-error', errorText(error, '删除失败'));
   } finally {
     setSaving(false);
   }
@@ -844,7 +1181,8 @@ async function uploadImage(file) {
   await state.client.putBinary(repoPath, compressed.base64, {
     message: `assets: 上传图片 ${filename}`,
   });
-  return { url: `/uploads/${month}/${filename}`, bytes: compressed.bytes };
+  state.imagesLoaded = false;
+  return { url: publicUrl(repoPath), path: repoPath, bytes: compressed.bytes };
 }
 
 async function handleBodyImage(file) {
@@ -853,10 +1191,10 @@ async function handleBodyImage(file) {
   try {
     const uploaded = await uploadImage(file);
     if (!uploaded) return;
-    insertText(`\n\n![${file.name.replace(/\.[^.]+$/, '')}](${uploaded.url})\n\n`);
+    insertText(`\n\n![${String(file.name).replace(/\.[^.]+$/, '')}](${uploaded.url})\n\n`);
     toast(`图片已上传（${formatBytes(uploaded.bytes)}）`);
   } catch (error) {
-    toast((error && error.message) || '图片上传失败', { type: 'error' });
+    toast(errorText(error, '图片上传失败'), { type: 'error' });
   }
 }
 
@@ -873,7 +1211,7 @@ async function handleCoverImage(file) {
     toast('封面已上传');
   } catch (error) {
     status.textContent = '';
-    toast((error && error.message) || '封面图上传失败', { type: 'error' });
+    toast(errorText(error, '封面图上传失败'), { type: 'error' });
   }
 }
 
@@ -940,11 +1278,11 @@ function togglePreview() {
   else enterPreview();
 }
 
-/* ---------- 自动草稿 ---------- */
+/* ---------- 自动草稿（按文章分槽位） ---------- */
 
 function autosaveKeyForCurrent() {
   if (!state.current) return '';
-  return state.current.isNew ? '__new__' : state.current.slug;
+  return draftKeyForSlug(state.current.isNew ? NEW_DRAFT_KEY : state.current.slug);
 }
 
 function collectSnapshot() {
@@ -969,9 +1307,13 @@ function collectSnapshot() {
   };
 }
 
+/** 立刻把当前编辑器内容写进本机草稿；返回是否真的写成功 */
 function persistAutosave() {
-  if (state.demo || state.view !== 'edit' || !state.current) return;
-  writeJson(KEYS.autosave, collectSnapshot());
+  if (state.demo || state.view !== 'edit' || !state.current) return false;
+  const key = autosaveKeyForCurrent();
+  if (!key) return false;
+  writeDraftsStore(putDraft(readDraftsStore(), key, collectSnapshot()));
+  return true;
 }
 
 function scheduleAutosave() {
@@ -980,9 +1322,11 @@ function scheduleAutosave() {
   state.autosaveTimer = window.setTimeout(persistAutosave, 700);
 }
 
-function clearAutosave() {
+function clearAutosave(key) {
   clearTimeout(state.autosaveTimer);
-  removeKey(KEYS.autosave);
+  const slot = key || autosaveKeyForCurrent();
+  if (!slot) return;
+  writeDraftsStore(removeDraft(readDraftsStore(), slot));
 }
 
 function applySnapshot(snapshot) {
@@ -1007,30 +1351,200 @@ function applySnapshot(snapshot) {
 
 async function restoreAutosaveIfAny() {
   if (state.demo) return;
-  const snapshot = readJson(KEYS.autosave);
-  if (!snapshot || snapshot.key !== autosaveKeyForCurrent()) return;
+  const key = autosaveKeyForCurrent();
+  const snapshot = pickDraft(readDraftsStore(), key);
+  if (!snapshot) return;
 
   const same =
     snapshot.title === $('f-title').value &&
     snapshot.body === $('f-body').value &&
     snapshot.slug === $('f-slug').value &&
     snapshot.description === $('f-desc').value;
-  if (same) return;
+  if (same) {
+    clearAutosave(key); // 和仓库里的内容一致，这份草稿已经没用了
+    return;
+  }
 
   const restore = await showModal({
-    title: '有未保存的本地草稿',
-    text: `${formatDateTime(snapshot.savedAt)} 自动保存的内容，可能比仓库里的新。恢复吗？`,
+    title: snapshot.remoteBackup ? '本机留着一份远端旧版本' : '有未保存的本地草稿',
+    text: snapshot.remoteBackup
+      ? `${formatDateTime(snapshot.savedAt)} 覆盖保存时留下的远端内容。恢复会用它的文字替换当前编辑器里的内容。`
+      : `${formatDateTime(snapshot.savedAt)} 自动保存的内容，可能比仓库里的新。恢复吗？`,
     actions: [
       { label: '丢弃', value: false },
       { label: '恢复', value: true, kind: 'primary' },
     ],
   });
   if (restore) applySnapshot(snapshot);
-  else clearAutosave();
+  else clearAutosave(key);
 }
 
 /* ------------------------------------------------------------------ *
- * 6. 主题 / 事件绑定 / 启动
+ * 7. 图片库
+ * ------------------------------------------------------------------ */
+
+function renderLibrary() {
+  const grid = $('library-grid');
+  const list = state.images;
+  grid.replaceChildren();
+  $('library-empty').hidden = list.length > 0;
+  $('library-status').textContent = list.length
+    ? `共 ${list.length} 张 · 都在 ${UPLOADS_DIR}/ 下，点「插入正文」会把标记写到光标处`
+    : '';
+
+  for (const image of list) {
+    const url = publicUrl(image.path);
+    const item = document.createElement('div');
+    item.className = 'image-item';
+
+    const img = document.createElement('img');
+    img.className = 'image-thumb';
+    img.loading = 'lazy';
+    img.src = url;
+    img.alt = image.name;
+
+    const body = document.createElement('div');
+    body.className = 'image-item-body';
+
+    const name = document.createElement('span');
+    name.className = 'image-name';
+    name.textContent = `${image.name} · ${formatBytes(image.size)}`;
+
+    const buttons = document.createElement('div');
+    buttons.className = 'image-btns';
+
+    const insert = document.createElement('button');
+    insert.type = 'button';
+    insert.className = 'btn small';
+    insert.textContent = '插入正文';
+    insert.addEventListener('click', () => {
+      closeLibrary();
+      insertText(`\n\n![](${url})\n\n`);
+      toast('已插入图片标记');
+    });
+
+    const cover = document.createElement('button');
+    cover.type = 'button';
+    cover.className = 'btn small';
+    cover.textContent = '设为封面';
+    cover.addEventListener('click', () => {
+      $('f-cover').value = url;
+      markDirty();
+      closeLibrary();
+      toast('已设为封面图');
+    });
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn small danger';
+    remove.textContent = '删除';
+    remove.addEventListener('click', () => deleteLibraryImage(image));
+
+    buttons.append(insert, cover, remove);
+    body.append(name, buttons);
+    item.append(img, body);
+    grid.append(item);
+  }
+}
+
+async function openLibrary() {
+  if (!state.client) return;
+  $('library').hidden = false;
+  clearError('library-error');
+  $('library-grid').replaceChildren();
+  $('library-empty').hidden = true;
+
+  if (state.imagesLoaded) {
+    renderLibrary();
+    return;
+  }
+  $('library-status').textContent = '正在读取 public/uploads …';
+  try {
+    const files = await state.client.listTree(UPLOADS_DIR);
+    state.images = files.filter((file) => IMAGE_RE.test(file.path));
+    state.imagesLoaded = true;
+    renderLibrary();
+  } catch (error) {
+    $('library-status').textContent = '';
+    showError('library-error', errorText(error, '读取图片列表失败'));
+  }
+}
+
+function closeLibrary() {
+  $('library').hidden = true;
+}
+
+async function refreshLibrary() {
+  state.imagesLoaded = false;
+  $('library-status').textContent = '刷新中…';
+  try {
+    const files = await state.client.listTree(UPLOADS_DIR);
+    state.images = files.filter((file) => IMAGE_RE.test(file.path));
+    state.imagesLoaded = true;
+    clearError('library-error');
+    renderLibrary();
+  } catch (error) {
+    showError('library-error', errorText(error, '刷新失败'));
+  }
+}
+
+async function deleteLibraryImage(image) {
+  const confirmed = await showModal({
+    title: '删除这张图片？',
+    text: `${image.path} 会从仓库删掉。已经发布、引用它的文章会显示不出图（Git 历史里还能找回）。`,
+    actions: [
+      { label: '取消', value: false },
+      { label: '删除', value: true, kind: 'danger' },
+    ],
+  });
+  if (!confirmed) return;
+  $('library-status').textContent = '正在删除…';
+  try {
+    await state.client.commitFiles([{ path: image.path, delete: true }], {
+      message: `assets: 删除图片 ${image.name}`,
+    });
+    state.images = state.images.filter((item) => item.path !== image.path);
+    renderLibrary();
+    toast('图片已删除');
+  } catch (error) {
+    showError('library-error', errorText(error, '删除图片失败'));
+  }
+}
+
+async function handleLibraryUpload(files) {
+  if (!files || files.length === 0) return;
+  $('library-status').textContent = `正在上传 ${files.length} 张图片…`;
+  let done = 0;
+  for (const file of files) {
+    try {
+      await uploadImage(file);
+      done += 1;
+    } catch (error) {
+      showError('library-error', errorText(error, '图片上传失败'));
+    }
+  }
+  await refreshLibrary();
+  if (done > 0) toast(`已上传 ${done} 张图片`);
+}
+
+/* ---------- 粘贴 / 拖拽多图 ---------- */
+
+function imageFilesFrom(dataTransfer) {
+  if (!dataTransfer) return [];
+  const files = [...(dataTransfer.files || [])];
+  if (files.length === 0 && dataTransfer.items) {
+    for (const item of dataTransfer.items) {
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (file) files.push(file);
+      }
+    }
+  }
+  return files.filter((file) => file && file.type && file.type.startsWith('image/'));
+}
+
+/* ------------------------------------------------------------------ *
+ * 8. 主题 / 事件绑定 / 启动
  * ------------------------------------------------------------------ */
 
 function applyTheme(theme) {
@@ -1049,6 +1563,15 @@ function toggleTheme() {
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
 }
 
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  const local = ['localhost', '127.0.0.1'].includes(location.hostname);
+  if (location.protocol !== 'https:' && !local) return;
+  navigator.serviceWorker.register('/admin/sw.js', { scope: '/admin/' }).catch(() => {
+    /* 注册失败也不影响写作 */
+  });
+}
+
 function bindEvents() {
   $('btn-theme').addEventListener('click', toggleTheme);
   $('btn-settings').addEventListener('click', () => {
@@ -1058,13 +1581,17 @@ function bindEvents() {
 
   $('btn-refresh').addEventListener('click', () => {
     loadPosts()
-      .then(renderPosts)
-      .catch((error) => toast((error && error.message) || '刷新失败', { type: 'error' }));
+      .then(() => {
+        renderPosts();
+        renderDraftHint();
+      })
+      .catch((error) => toast(errorText(error, '刷新失败'), { type: 'error' }));
   });
   $('btn-new').addEventListener('click', () => {
     location.hash = '#/new';
   });
   $('search').addEventListener('input', renderPosts);
+  $('btn-clear-drafts').addEventListener('click', clearAllDrafts);
 
   $('edit-form').addEventListener('submit', savePost);
   $('btn-back').addEventListener('click', goBackFromEditor);
@@ -1095,9 +1622,9 @@ function bindEvents() {
   }
 
   $('image-file').addEventListener('change', async (event) => {
-    const file = event.target.files && event.target.files[0];
+    const files = [...(event.target.files || [])];
     event.target.value = '';
-    await handleBodyImage(file);
+    for (const file of files) await handleBodyImage(file);
   });
   $('cover-file').addEventListener('change', async (event) => {
     const file = event.target.files && event.target.files[0];
@@ -1105,6 +1632,38 @@ function bindEvents() {
     await handleCoverImage(file);
   });
   $('btn-cover-upload').addEventListener('click', () => $('cover-file').click());
+
+  // 手机相册之外的两条快捷路径：剪贴板粘贴、桌面拖进来
+  const bodyArea = $('f-body');
+  bodyArea.addEventListener('paste', async (event) => {
+    const images = imageFilesFrom(event.clipboardData);
+    if (images.length === 0) return;
+    event.preventDefault();
+    for (const file of images) await handleBodyImage(file);
+  });
+  for (const type of ['dragenter', 'dragover']) {
+    bodyArea.addEventListener(type, (event) => {
+      if (imageFilesFrom(event.dataTransfer).length > 0) event.preventDefault();
+    });
+  }
+  bodyArea.addEventListener('drop', async (event) => {
+    const images = imageFilesFrom(event.dataTransfer);
+    if (images.length === 0) return;
+    event.preventDefault();
+    for (const file of images) await handleBodyImage(file);
+  });
+
+  $('btn-library').addEventListener('click', openLibrary);
+  $('btn-library-close').addEventListener('click', closeLibrary);
+  $('btn-library-upload').addEventListener('click', () => $('library-file').click());
+  $('library-file').addEventListener('change', async (event) => {
+    const files = [...(event.target.files || [])];
+    event.target.value = '';
+    await handleLibraryUpload(files);
+  });
+  $('library').addEventListener('click', (event) => {
+    if (event.target === $('library')) closeLibrary();
+  });
 
   $('btn-test').addEventListener('click', testSettings);
   $('btn-save-settings').addEventListener('click', saveSettings);
@@ -1115,7 +1674,10 @@ function bindEvents() {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !$('modal').hidden) closeModal(null);
+    if (event.key === 'Escape') {
+      if (!$('library').hidden) closeLibrary();
+      else if (!$('modal').hidden) closeModal(null);
+    }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
       event.preventDefault();
       if (state.view === 'edit') savePost(event);
@@ -1124,7 +1686,7 @@ function bindEvents() {
 
   window.addEventListener('resize', syncHeaderOffset);
   window.addEventListener('hashchange', () => {
-    route().catch((error) => toast((error && error.message) || '页面加载失败', { type: 'error' }));
+    route().catch((error) => toast(errorText(error, '页面加载失败'), { type: 'error' }));
   });
   window.addEventListener('beforeunload', (event) => {
     if (state.view === 'edit' && state.dirty) {
@@ -1134,6 +1696,7 @@ function bindEvents() {
   });
 
   const updateOnline = () => {
+    state.offline = !navigator.onLine;
     $('offline-banner').hidden = navigator.onLine;
   };
   window.addEventListener('online', updateOnline);
@@ -1143,8 +1706,10 @@ function bindEvents() {
 
 async function boot() {
   syncHeaderOffset();
+  state.drafts = readDraftsStore();
   bindEvents();
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+  registerServiceWorker();
 
   const demo = new URLSearchParams(location.search).get('demo') === '1';
   if (demo) {
@@ -1163,13 +1728,14 @@ async function boot() {
     setView('boot');
     try {
       await connect(state.config);
+      checkTokenAge();
       await route();
     } catch (error) {
       state.client = null;
       setView('setup');
       $('setup-token').value = saved.token;
       setConnected(false, '连接失败');
-      showError('setup-error', `${(error && error.message) || '连接失败'}。请检查令牌是否过期、仓库权限是否包含 Contents。`);
+      showError('setup-error', `${errorText(error, '连接失败')}。请检查令牌是否过期、仓库权限是否包含 Contents。`);
     }
     return;
   }
