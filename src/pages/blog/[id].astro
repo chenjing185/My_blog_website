@@ -266,6 +266,40 @@ const showPageViews = STATS.enabled && STATS.showPageViews;
     align-items: start;
   }
 
+  /*
+   * 目录吸附：grid 的 align-items:start 会让 aside 高度等于目录高度，
+   * sticky 就没有可移动的空间，所以吸附必须加在 aside 本身。
+   * 目录比视口高时（长文章）在 aside 内滚动，避免底部章节够不着。
+   */
+  .post-aside {
+    position: sticky;
+    top: calc(var(--header-h) + 32px);
+    align-self: start;
+    max-height: calc(100vh - var(--header-h) - 64px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  .post-aside::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .post-aside::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .post-aside::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 999px;
+  }
+
+  .post-aside::-webkit-scrollbar-thumb:hover {
+    background: var(--text-dim);
+  }
+
   .post {
     min-width: 0;
     max-width: var(--prose);

@@ -1,0 +1,36 @@
+---
+/**
+ * 主题背景层：暗色是夜空（星光 / 月亮 / 流星），明色是蓝天白云。
+ * 纯 CSS 绘制 + CSS 动画，无图片、无脚本；由 data-theme 切换显示哪一层。
+ */
+---
+
+<div class="sky" aria-hidden="true">
+  <div class="sky__night">
+    <div class="sky__moonlight"></div>
+    <div class="sky__stars sky__stars--1"></div>
+    <div class="sky__stars sky__stars--2"></div>
+    <div class="sky__stars sky__stars--3"></div>
+    <div class="sky__moon"></div>
+
+    <span class="sky__meteor" style="--top:-5%;--left:5%;--dur:17s;--delay:0s"></span>
+    <span class="sky__meteor" style="--top:1%;--left:33%;--dur:23s;--delay:6.5s;--len:118px"></span>
+    <span
+      class="sky__meteor sky__meteor--sm-hide"
+      style="--top:-9%;--left:58%;--dur:29s;--delay:14s;--len:186px"></span>
+  </div>
+
+  <div class="sky__day">
+    <div class="sky__clouds">
+      <span class="sky__cloud" style="--w:340px;--top:5%;--left:6%;--dur:260s;--delay:-40s;--o:1"></span>
+      <span class="sky__cloud" style="--w:230px;--top:16%;--left:46%;--dur:200s;--delay:-140s;--o:.85"></span>
+      <span class="sky__cloud" style="--w:190px;--top:9%;--left:72%;--dur:180s;--delay:-92s;--o:.9"></span>
+      <span
+        class="sky__cloud sky__cloud--sm-hide"
+        style="--w:430px;--top:23%;--left:22%;--dur:320s;--delay:-220s;--o:.65"></span>
+      <span
+        class="sky__cloud sky__cloud--sm-hide"
+        style="--w:260px;--top:33%;--left:60%;--dur:240s;--delay:-60s;--o:.5"></span>
+    </div>
+  </div>
+</div>

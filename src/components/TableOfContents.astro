@@ -82,8 +82,8 @@ const items = headings.filter((h) => h.depth === 2 || h.depth === 3);
 
 <style>
   .toc {
-    position: sticky;
-    top: calc(var(--header-h) + 32px);
+    /* 吸附交给外层容器（.post-aside）：目录比视口高时容器内部滚动，
+       这里再写 sticky 会相对滚动容器错位，故只负责排版 */
     font-family: var(--font-mono);
     font-size: 12.5px;
     line-height: 1.6;

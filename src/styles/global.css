@@ -7,23 +7,26 @@
 :root {
   color-scheme: dark;
 
-  --bg: #0a0c10;
-  --bg-grid: rgba(255, 255, 255, 0.022);
-  --surface: #0f141a;
-  --surface-2: #141b23;
-  --code-bg: #0b1016;
+  /* 夜空：略提亮并把黑压成深靛蓝，避免"纯黑发闷" */
+  --bg: #0b1220;
+  --bg-grid: rgba(255, 255, 255, 0.018);
+  --surface: #111a2b;
+  --surface-2: #16223a;
+  --code-bg: #0b1420;
 
-  --border: #1d2530;
-  --border-strong: #2c3743;
+  --border: #22304a;
+  --border-strong: #35476b;
 
-  --text: #e6edf3;
-  --text-muted: #93a1b0;
-  --text-dim: #5f6d7c;
+  --text: #e7eef8;
+  --text-muted: #9db0c8;
+  --text-dim: #6d819c;
 
   --accent: #2dd4bf;
   --accent-strong: #5eead4;
-  --accent-soft: rgba(45, 212, 191, 0.1);
-  --accent-line: rgba(45, 212, 191, 0.35);
+  --accent-soft: rgba(45, 212, 191, 0.12);
+  --accent-line: rgba(45, 212, 191, 0.34);
+
+  --shadow-lg: 0 22px 60px -32px rgba(2, 6, 16, 0.75);
 
   --radius-sm: 6px;
   --radius: 10px;
@@ -42,23 +45,26 @@
 [data-theme='light'] {
   color-scheme: light;
 
-  --bg: #fcfcfb;
-  --bg-grid: rgba(0, 0, 0, 0.028);
-  --surface: #f5f6f5;
-  --surface-2: #eceeed;
-  --code-bg: #f4f6f5;
+  /* 白天：天空蓝打底，不再用刺眼的近白色 */
+  --bg: #eef6fd;
+  --bg-grid: rgba(23, 62, 104, 0.026);
+  --surface: #f9fcff;
+  --surface-2: #e4f0fb;
+  --code-bg: #f2f9ff;
 
-  --border: #e2e5e3;
-  --border-strong: #cdd3cf;
+  --border: #d2e3f2;
+  --border-strong: #b6cfe4;
 
-  --text: #12181d;
-  --text-muted: #55636e;
-  --text-dim: #85929c;
+  --text: #152231;
+  --text-muted: #4a5d72;
+  --text-dim: #6f8296;
 
   --accent: #0d9488;
   --accent-strong: #0f766e;
-  --accent-soft: rgba(13, 148, 136, 0.09);
-  --accent-line: rgba(13, 148, 136, 0.35);
+  --accent-soft: rgba(13, 148, 136, 0.1);
+  --accent-line: rgba(13, 148, 136, 0.32);
+
+  --shadow-lg: 0 22px 60px -34px rgba(31, 74, 118, 0.28);
 }
 
 /* ---------- 2. 基础重置 ---------- */
@@ -76,16 +82,14 @@ html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--header-h) + 24px);
+  /* 天空层固定在 body 之下，这里只留同色兜底，避免滚动回弹时露白 */
+  background: var(--bg);
 }
 
 body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg);
-  /* 细点阵背景，极客感的关键细节 */
-  background-image: radial-gradient(var(--bg-grid) 1px, transparent 1px);
-  background-size: 22px 22px;
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 16px;
@@ -471,7 +475,7 @@ hr {
   border-radius: var(--radius-lg);
   background: var(--surface);
   overflow: hidden;
-  box-shadow: 0 20px 60px -30px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-lg);
 }
 
 .term__bar {

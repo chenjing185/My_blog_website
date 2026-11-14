@@ -4,7 +4,9 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import BaseHead from '../components/BaseHead.astro';
 import CommandPalette from '../components/CommandPalette.astro';
+import SkyBackdrop from '../components/SkyBackdrop.astro';
 import '../styles/global.css';
+import '../styles/sky.css';
 
 interface Props {
   title?: string;
@@ -34,6 +36,7 @@ const { title, description, image, type = 'website', noindex = false } = Astro.p
     <BaseHead title={title} description={description} image={image} type={type} noindex={noindex} />
   </head>
   <body>
+    <SkyBackdrop />
     <a class="skip-link" href="#main">跳到正文</a>
     <Header />
     <main id="main" class="site-main">

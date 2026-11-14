@@ -1,0 +1,315 @@
+/* ==========================================================================
+   sky — 主题背景层
+   暗色：夜空 + 星光 + 月光 + 流星
+   明色：蓝天 + 白云
+   固定在最底层（z-index:-1），不参与交互，不阻塞阅读
+   ========================================================================== */
+
+.sky {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--bg);
+  /* 极淡点阵，保留原来的极客质感 */
+  background-image: radial-gradient(var(--bg-grid) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.sky__night,
+.sky__day {
+  position: absolute;
+  inset: 0;
+}
+
+.sky__day {
+  display: none;
+}
+
+[data-theme='light'] .sky__night {
+  display: none;
+}
+
+[data-theme='light'] .sky__day {
+  display: block;
+}
+
+/* ---------- 夜空 ---------- */
+.sky__night {
+  background:
+    radial-gradient(900px 520px at 80% -8%, rgba(122, 162, 255, 0.22), transparent 68%),
+    radial-gradient(1100px 700px at 8% 2%, rgba(70, 118, 214, 0.16), transparent 70%),
+    linear-gradient(180deg, #0a1024 0%, #0c1626 34%, #0b1220 64%, #0a111d 100%);
+}
+
+/* 星光：三层不同密度/速度，靠 mask 让头顶密、正文区淡 */
+.sky__stars {
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat;
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    #000 0%,
+    rgba(0, 0, 0, 0.8) 30%,
+    rgba(0, 0, 0, 0.34) 58%,
+    rgba(0, 0, 0, 0.08) 82%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    180deg,
+    #000 0%,
+    rgba(0, 0, 0, 0.8) 30%,
+    rgba(0, 0, 0, 0.34) 58%,
+    rgba(0, 0, 0, 0.08) 82%,
+    transparent 100%
+  );
+  animation: sky-twinkle 8s ease-in-out infinite;
+}
+
+.sky__stars--1 {
+  background-image:
+    radial-gradient(1.1px 1.1px at 12px 26px, rgba(255, 255, 255, 0.9), transparent 100%),
+    radial-gradient(1px 1px at 58px 142px, rgba(226, 238, 255, 0.8), transparent 100%),
+    radial-gradient(1.2px 1.2px at 96px 64px, rgba(255, 255, 255, 0.85), transparent 100%),
+    radial-gradient(1px 1px at 142px 212px, rgba(210, 230, 255, 0.7), transparent 100%),
+    radial-gradient(1.1px 1.1px at 188px 110px, rgba(255, 255, 255, 0.75), transparent 100%),
+    radial-gradient(1px 1px at 214px 34px, rgba(226, 238, 255, 0.65), transparent 100%),
+    radial-gradient(1.2px 1.2px at 232px 178px, rgba(255, 255, 255, 0.8), transparent 100%),
+    radial-gradient(1px 1px at 74px 234px, rgba(210, 230, 255, 0.6), transparent 100%),
+    radial-gradient(1px 1px at 168px 248px, rgba(255, 255, 255, 0.7), transparent 100%);
+  background-size: 260px 260px;
+  animation-duration: 7s;
+}
+
+.sky__stars--2 {
+  background-image:
+    radial-gradient(1.5px 1.5px at 40px 60px, rgba(255, 255, 255, 0.95), transparent 100%),
+    radial-gradient(1.3px 1.3px at 176px 148px, rgba(214, 236, 255, 0.85), transparent 100%),
+    radial-gradient(1.6px 1.6px at 268px 42px, rgba(255, 255, 255, 0.9), transparent 100%),
+    radial-gradient(1.3px 1.3px at 312px 244px, rgba(230, 242, 255, 0.7), transparent 100%),
+    radial-gradient(1.4px 1.4px at 120px 300px, rgba(255, 255, 255, 0.8), transparent 100%),
+    radial-gradient(1.2px 1.2px at 352px 168px, rgba(200, 226, 255, 0.6), transparent 100%),
+    radial-gradient(16px 16px at 176px 148px, rgba(150, 195, 255, 0.16), transparent 100%);
+  background-size: 380px 380px;
+  animation-duration: 11s;
+  animation-direction: reverse;
+  opacity: 0.9;
+}
+
+.sky__stars--3 {
+  background-image:
+    radial-gradient(2px 2px at 116px 96px, rgba(255, 255, 255, 0.95), transparent 60%),
+    radial-gradient(26px 26px at 116px 96px, rgba(160, 200, 255, 0.22), transparent 100%),
+    radial-gradient(1.8px 1.8px at 404px 268px, rgba(214, 240, 255, 0.9), transparent 60%),
+    radial-gradient(22px 22px at 404px 268px, rgba(150, 195, 255, 0.18), transparent 100%),
+    radial-gradient(2.2px 2.2px at 288px 410px, rgba(255, 255, 255, 0.9), transparent 60%),
+    radial-gradient(30px 30px at 288px 410px, rgba(150, 195, 255, 0.16), transparent 100%);
+  background-size: 620px 620px;
+  animation-duration: 15s;
+  opacity: 0.85;
+}
+
+@keyframes sky-twinkle {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 月光：月亮 + 月晕 + 洒在天上的冷光 */
+.sky__moonlight {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(820px 560px at 84% 4%, rgba(176, 204, 255, 0.18), transparent 66%),
+    linear-gradient(202deg, rgba(148, 184, 255, 0.12) 0%, rgba(120, 160, 240, 0.04) 30%, transparent 52%);
+}
+
+.sky__moon {
+  position: absolute;
+  top: clamp(40px, 8vh, 104px);
+  right: clamp(16px, 8vw, 132px);
+  width: clamp(56px, 7vw, 88px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #fdfbf0 0%, #f4f0dd 44%, #e3dec7 72%, #cdc7b0 100%);
+  box-shadow:
+    0 0 20px 4px rgba(238, 244, 255, 0.32),
+    0 0 80px 26px rgba(150, 186, 255, 0.18),
+    0 0 200px 80px rgba(110, 150, 230, 0.1);
+}
+
+.sky__moon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 26%, rgba(148, 143, 118, 0.32) 0 9%, transparent 10%),
+    radial-gradient(circle at 63% 41%, rgba(148, 143, 118, 0.24) 0 13%, transparent 14%),
+    radial-gradient(circle at 42% 69%, rgba(148, 143, 118, 0.2) 0 8%, transparent 9%),
+    radial-gradient(circle at 76% 71%, rgba(148, 143, 118, 0.16) 0 6%, transparent 7%);
+}
+
+/* 月晕呼吸 */
+.sky__moon::after {
+  content: '';
+  position: absolute;
+  inset: -14%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200, 220, 255, 0.16), transparent 68%);
+  animation: sky-moon-breathe 12s ease-in-out infinite;
+}
+
+@keyframes sky-moon-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+/* 流星：拖尾 + 尾迹发光，长间隔随机出现 */
+.sky__meteor {
+  position: absolute;
+  top: var(--top, -4%);
+  left: var(--left, 10%);
+  width: var(--len, 150px);
+  height: 1.6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(186, 222, 255, 0.35) 45%,
+    rgba(226, 240, 255, 0.85) 82%,
+    #fff 100%
+  );
+  filter: drop-shadow(0 0 5px rgba(190, 224, 255, 0.6));
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: sky-meteor var(--dur, 16s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes sky-meteor {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(29deg);
+  }
+  2% {
+    opacity: 0;
+  }
+  4% {
+    opacity: 1;
+  }
+  11% {
+    opacity: 0;
+    transform: translate3d(360px, 200px, 0) rotate(29deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(360px, 200px, 0) rotate(29deg);
+  }
+}
+
+/* ---------- 白天 ---------- */
+.sky__day {
+  background:
+    radial-gradient(760px 460px at 22% -12%, rgba(255, 253, 244, 0.9), transparent 62%),
+    radial-gradient(900px 520px at 88% 0%, rgba(255, 255, 255, 0.55), transparent 66%),
+    linear-gradient(180deg, #b7d8f8 0%, #cdE7fb 20%, #dff0fd 42%, #e9f4fd 66%, #eef6fd 100%);
+}
+
+.sky__clouds {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 30%, rgba(0, 0, 0, 0.55) 52%, transparent 80%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 30%, rgba(0, 0, 0, 0.55) 52%, transparent 80%);
+}
+
+.sky__cloud {
+  position: absolute;
+  top: var(--top, 10%);
+  left: var(--left, 20%);
+  width: var(--w, 240px);
+  height: calc(var(--w, 240px) * 0.26);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 55%, #e2effb 100%);
+  box-shadow:
+    inset 0 -8px 14px -8px rgba(140, 184, 222, 0.45),
+    inset 0 6px 10px -6px rgba(255, 255, 255, 0.9),
+    0 14px 30px -16px rgba(88, 138, 188, 0.4);
+  filter: blur(0.5px);
+  opacity: var(--o, 0.85);
+  will-change: transform;
+  animation: sky-cloud-drift var(--dur, 220s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+.sky__cloud::before,
+.sky__cloud::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: inherit;
+}
+
+.sky__cloud::before {
+  width: 44%;
+  height: 165%;
+  left: 12%;
+  bottom: 38%;
+}
+
+.sky__cloud::after {
+  width: 32%;
+  height: 120%;
+  left: 52%;
+  bottom: 42%;
+}
+
+@keyframes sky-cloud-drift {
+  from {
+    transform: translate3d(-140vw, 0, 0);
+  }
+  to {
+    transform: translate3d(140vw, 0, 0);
+  }
+}
+
+/* ---------- 小屏与降级 ---------- */
+@media (max-width: 720px) {
+  .sky__cloud--sm-hide,
+  .sky__meteor--sm-hide {
+    display: none;
+  }
+
+  .sky__moon {
+    top: 26px;
+    right: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sky__stars,
+  .sky__moon::after,
+  .sky__cloud {
+    animation: none !important;
+  }
+
+  .sky__stars {
+    opacity: 0.9;
+  }
+
+  .sky__meteor {
+    display: none;
+  }
+}
